@@ -1,0 +1,36 @@
+services:
+  mongodb:
+    image: mongodb/mongodb-community-server:latest
+    container_name: db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-password}
+    restart: unless-stopped
+    networks:
+      - default
+  minio:
+    image: bitnami/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-storage:/data/minio
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-admin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-pass1234}
+    restart: unless-stopped
+    networks:
+      - default
+
+volumes:
+  mongodb-data:
+  minio-storage:
+
+networks:
+  default:
+    driver: bridge
