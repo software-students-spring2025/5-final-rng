@@ -1,4 +1,12 @@
-from flask import Blueprint, request, redirect, url_for, render_template, flash, send_file
+from flask import (
+    Blueprint,
+    request,
+    redirect,
+    url_for,
+    render_template,
+    flash,
+    send_file,
+)
 from pymongo import MongoClient
 import os
 import uuid
@@ -10,6 +18,7 @@ UPLOAD_FOLDER = "uploads"
 client = MongoClient("mongodb://mongo:27017/")
 db = client["filesharing"]
 files_collection = db["uploads"]
+
 
 @main.route("/", methods=["GET", "POST"])
 def index():
@@ -24,24 +33,27 @@ def index():
         local_path = os.path.join(UPLOAD_FOLDER, saved_name)
         uploaded_file.save(local_path)
 
-        files_collection.insert_one({
-            "file_id": file_id,
-            "filename": uploaded_file.filename,
-            "saved_filename": saved_name,
-            "upload_time": datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
-            "password": password
-        })
+        files_collection.insert_one(
+            {
+                "file_id": file_id,
+                "filename": uploaded_file.filename,
+                "saved_filename": saved_name,
+                "upload_time": datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
+                "password": password,
+            }
+        )
 
         return redirect(url_for("main.verify_password", file_id=file_id))
 
-    return '''
+    return """
     <h2>Upload File</h2>
     <form method="post" enctype="multipart/form-data">
       <input type="file" name="file" required><br><br>
       <input type="text" name="password" placeholder="Set password" required><br><br>
       <input type="submit" value="Upload">
     </form>
-    '''
+    """
+
 
 @main.route("/file/<file_id>", methods=["GET", "POST"])
 def verify_password(file_id):
@@ -57,6 +69,7 @@ def verify_password(file_id):
             flash("Incorrect password!", "error")
 
     return render_template("verify.html", file_id=file_id)
+
 
 @main.route("/download/<file_id>")
 def direct_download(file_id):
