@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python, pipenv, and Pipfile packages
+        uses: kojoru/prepare-pipenv@v1
+        with:
+          python-version: "3.12.3"
+
+      - name: Install Project Dependencies
+        run: |
+          pipenv install --dev
+
+      - name: Test with pytest
+        run: |
+          pipenv run pytest
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python, pipenv, and Pipfile packages
+        uses: kojoru/prepare-pipenv@v1
+        with:
+          python-version: "3.12.3"
+
+      - name: Install Project Dependencies
+        run: |
+          pipenv install --dev
+
+      - name: lint with ruff
+        uses: astral-sh/ruff-action@v3
+      - run: ruff check --fix
+      - run: ruff format
