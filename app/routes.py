@@ -15,7 +15,7 @@ from datetime import datetime
 main = Blueprint("main", __name__)
 UPLOAD_FOLDER = "uploads"
 
-client = MongoClient("mongodb://mongo:27017/")
+client = MongoClient(os.getenv("MONGO_URI", "mongodb://admin:password@db:27017"))
 db = client["filesharing"]
 files_collection = db["uploads"]
 
