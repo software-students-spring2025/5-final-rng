@@ -170,7 +170,7 @@
       </div>
     </div>
     
-    <form action="{{ url_for('main.verify_password', file_id=file_id) }}" method="POST" class="access-form">
+    <form action="{{ url_for('main.access_file', file_id=file_id) }}" method="POST" class="access-form">
       {% if has_password %}
       <div class="form-group">
         <label for="password">This file is password protected</label>

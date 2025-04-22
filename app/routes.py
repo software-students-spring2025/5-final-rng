@@ -1,6 +1,5 @@
 import os
 from datetime import datetime
-from nanoid import generate
 
 from flask import (
     Blueprint,
@@ -9,9 +8,9 @@ from flask import (
     redirect,
     render_template,
     request,
-    send_file,
     url_for,
 )
+from nanoid import generate
 from pymongo import MongoClient
 
 main = Blueprint("main", __name__)
@@ -137,18 +136,17 @@ def upload_file():
             {
                 "success": True,
                 "file_id": file_id,
-                "redirect_url": url_for("main.verify_password", file_id=file_id),
+                "redirect_url": url_for("main.file_success", file_id=file_id),
             }
         )
 
-    # For regular form submit, redirect to the verification page
-    return redirect(url_for("main.verify_password", file_id=file_id))
+    return redirect(url_for("main.file_success", file_id=file_id))
 
 
-@main.route("/file/<file_id>", methods=["GET", "POST"])
-def verify_password(file_id):
-    """Password verification screen"""
-    file_doc = files_collection.find_one({"file_id": file_id})
+@main.route("/files/<file_id>", methods=["GET", "POST"])
+def access_file(file_id):
+    """Password verification screen and file download handler"""
+    file_doc = files_collection.find_one({"_id": file_id})
     if not file_doc:
         return jsonify({"error": "File not found"}), 404
 
@@ -163,9 +161,9 @@ def verify_password(file_id):
     )
 
 
-@main.route("/file/<file_id>")
-def file_info(file_id):
-    file_doc = files_collection.find_one({"file_id": file_id})
+@main.route("/files/<file_id>/success")
+def file_success(file_id):
+    file_doc = files_collection.find_one({"_id": file_id})
 
     if not file_doc:
         flash("File not found", "error")
@@ -182,10 +180,10 @@ def file_info(file_id):
 
     return render_template(
         "success.html",
-        file_id=file_doc["file_id"],
-        file_name=file_doc["filename"],
+        file_id=file_doc["_id"],
+        file_name=file_doc["original_filename"],
         file_size=format_file_size(file_doc["file_size"]),
         expiration_date=file_doc.get("expiration_date", "Never"),
         download_limit=file_doc.get("download_limit", 0) or "Unlimited",
-        download_url=url_for("main.download", file_id=file_doc["file_id"]),
+        download_url=url_for("main.access_file", file_id=file_doc["_id"]),
     )

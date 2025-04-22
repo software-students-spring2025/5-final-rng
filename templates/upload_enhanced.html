@@ -187,7 +187,7 @@
   <div class="container">
     <h1>Secure File Sharing</h1>
     
-    <form id="upload-form" action="{{ url_for('main.index') }}" method="POST" enctype="multipart/form-data">
+    <form id="upload-form" action="{{ url_for('main.index') }}" method="POST" enctype="multipart/form-data" autocomplete="off">
       <div class="upload-container">
         <!-- File Upload Area -->
         <div class="upload-area">
@@ -224,7 +224,7 @@
         <div class="metadata-area">
           <div class="form-group">
             <label for="password">Password</label>
-            <input type="password" id="password" name="password" required>
+            <input type="password" id="password" name="password" required autocomplete="new-password">
             <small>Recipients will need this password to access the file</small>
           </div>
           
@@ -388,49 +388,85 @@
           return;
         }
         
-        const formData = new FormData(uploadForm);
-        
-        // Show progress bar
-        progressContainer.style.display = 'block';
-        submitBtn.disabled = true;
-        
-        // Use XMLHttpRequest for upload with progress
-        const xhr = new XMLHttpRequest();
-        
-        xhr.upload.addEventListener('progress', function(e) {
-          if (e.lengthComputable) {
-            const percentComplete = Math.round((e.loaded / e.total) * 100);
-            progressFill.style.width = percentComplete + '%';
-            progressPercentage.textContent = percentComplete + '%';
-          }
-        });
-        
-        xhr.addEventListener('load', function() {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            // Success - redirect to the URL returned from the server
-            try {
-              const response = JSON.parse(xhr.responseText);
-              window.location.href = response.redirect_url || '/';
-            } catch (e) {
-              // If response is not JSON, just redirect to home
-              window.location.href = '/';
+        try {
+          // Create a new FormData object manually instead of from the form
+          const formData = new FormData();
+          
+          // Add the file
+          formData.append('file', fileInput.files[0]);
+          
+          // Add other form fields manually to avoid browser extension interference
+          formData.append('password', document.getElementById('password').value);
+          formData.append('expiration-date', document.getElementById('expiration-date').value);
+          formData.append('download-limit', document.getElementById('download-limit').value);
+          formData.append('description', document.getElementById('description').value);
+          
+          // Show progress bar
+          progressContainer.style.display = 'block';
+          submitBtn.disabled = true;
+          
+          // Use XMLHttpRequest for upload with progress
+          const xhr = new XMLHttpRequest();
+          
+          xhr.upload.addEventListener('progress', function(e) {
+            if (e.lengthComputable) {
+              const percentComplete = Math.round((e.loaded / e.total) * 100);
+              progressFill.style.width = percentComplete + '%';
+              progressPercentage.textContent = percentComplete + '%';
             }
-          } else {
-            // Error
-            alert('Upload failed. Please try again.');
+          });
+          
+          xhr.addEventListener('load', function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              // Success - redirect to the URL returned from the server
+              try {
+                const response = JSON.parse(xhr.responseText);
+                if (response.success && response.redirect_url) {
+                  window.location.href = response.redirect_url;
+                } else {
+                  // If response doesn't contain expected fields
+                  window.location.href = '/';
+                }
+              } catch (e) {
+                console.error('Error parsing response:', e);
+                // If response is not JSON, just redirect to home
+                window.location.href = '/';
+              }
+            } else {
+              // Error handling with more details
+              try {
+                const response = JSON.parse(xhr.responseText);
+                alert('Upload failed: ' + (response.error || 'Please try again.'));
+              } catch (e) {
+                alert('Upload failed. Please try again.');
+              }
+              submitBtn.disabled = false;
+              progressContainer.style.display = 'none';
+            }
+          });
+          
+          xhr.addEventListener('error', function() {
+            alert('Network error occurred. Please check your connection and try again.');
             submitBtn.disabled = false;
-          }
-        });
-        
-        xhr.addEventListener('error', function() {
-          alert('Upload failed. Please try again.');
+            progressContainer.style.display = 'none';
+          });
+          
+          xhr.addEventListener('abort', function() {
+            alert('Upload was aborted.');
+            submitBtn.disabled = false;
+            progressContainer.style.display = 'none';
+          });
+          
+          // Set up and send the request
+          xhr.open('POST', uploadForm.action, true);
+          xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+          xhr.send(formData);
+        } catch (error) {
+          console.error('Error during form submission:', error);
+          alert('An error occurred while preparing the upload. Please try again.');
           submitBtn.disabled = false;
-        });
-        
-        // Set up and send the request
-        xhr.open('POST', uploadForm.action, true);
-        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-        xhr.send(formData);
+          progressContainer.style.display = 'none';
+        }
       });
     });
   </script>
