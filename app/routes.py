@@ -10,6 +10,7 @@ from flask import (
 )
 from pymongo import MongoClient
 import os
+import smtplib
 import uuid
 from datetime import datetime
 
@@ -38,6 +39,7 @@ file_type_icons = {
     "default": "fa-file"
 }
 
+
 def get_file_icon(filename, content_type):
     """Determine the appropriate icon based on file type"""
     if content_type and content_type.startswith("image/"):
@@ -48,7 +50,7 @@ def get_file_icon(filename, content_type):
         return file_type_icons["audio"]
     elif content_type and content_type.startswith("application/pdf"):
         return file_type_icons["pdf"]
-    
+
     # Check extensions
     lowercase_name = filename.lower()
     if lowercase_name.endswith((".doc", ".docx")):
@@ -67,6 +69,7 @@ def index():
     """Render file upload form"""
     return render_template("upload_enhanced.html")
 
+
 @main.route("/", methods=["POST"])
 def upload_file():
     """Handle file upload and metadata"""
@@ -74,17 +77,17 @@ def upload_file():
     if "file" not in request.files:
         flash("No file selected", "error")
         return redirect(request.url)
-    
+
     file = request.files["file"]
     
     # Check if file was selected
     if file.filename == "":
         flash("No file selected", "error")
         return redirect(request.url)
-    
+
     # Generate a unique ID for the file
     file_id = str(uuid.uuid4())
-    
+
     # Get metadata from the form
     password = request.form.get("password", "")
     expiration_date = request.form.get("expiration-date", "")
@@ -96,7 +99,7 @@ def upload_file():
         download_limit = int(download_limit) if download_limit else 0
     except ValueError:
         download_limit = 0
-    
+
     # Save the file with a unique name
     original_filename = file.filename
     saved_name = f"{file_id}_{original_filename}"
@@ -124,9 +127,9 @@ def upload_file():
         "download_count": 0,
         "description": description
     }
-    
+
     files_collection.insert_one(file_data)
-    
+
     # Handle AJAX requests
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify({
@@ -138,6 +141,7 @@ def upload_file():
     # For regular form submit, redirect to the verification page
     return redirect(url_for("main.verify_password", file_id=file_id))
 
+
 @main.route("/file/<file_id>", methods=["GET", "POST"])
 def verify_password(file_id):
     """Password verification screen"""
@@ -145,7 +149,7 @@ def verify_password(file_id):
     if not file_doc:
         flash("File not found", "error")
         return redirect(url_for("main.index"))
-    
+
     # Check if file is expired
     if file_doc.get("expiration_date"):
         try:
@@ -156,16 +160,19 @@ def verify_password(file_id):
         except ValueError:
             # If date format is invalid, ignore expiration check
             pass
-    
+
     # Check if download limit is reached
-    if file_doc.get("download_limit") and file_doc["download_count"] >= file_doc["download_limit"]:
+    if (
+        file_doc.get("download_limit")
+        and file_doc["download_count"] >= file_doc["download_limit"]
+    ):
         flash("Download limit reached for this file", "error")
         return redirect(url_for("main.index"))
-    
+
     # Handle form submission (password verification)
     if request.method == "POST":
         entered_password = request.form.get("password", "")
-        
+
         # Verify password
         if file_doc.get("password") and entered_password != file_doc["password"]:
             flash("Incorrect password", "error")
@@ -181,6 +188,7 @@ def verify_password(file_id):
     # No password, go directly to preview
     return redirect(url_for("main.file_preview", file_id=file_id))
 
+
 @main.route("/preview/<file_id>")
 def file_preview(file_id):
     """Preview file before downloading"""
@@ -188,9 +196,10 @@ def file_preview(file_id):
     if not file_doc:
         flash("File not found", "error")
         return redirect(url_for("main.index"))
-    
+
     # Render preview template with file details
     return render_template("preview.html", file=file_doc)
+
 
 @main.route("/download/<file_id>")
 def direct_download(file_id):
@@ -199,7 +208,7 @@ def direct_download(file_id):
     if not file_doc:
         flash("File not found", "error")
         return redirect(url_for("main.index"))
-    
+
     local_path = file_doc.get("file_path")
     if not os.path.exists(local_path):
         flash("File not found on server", "error")
@@ -224,7 +233,7 @@ def file_preview_content(file_id):
     file_doc = files_collection.find_one({"file_id": file_id})
     if not file_doc:
         return "File not found", 404
-    
+
     local_path = file_doc.get("file_path")
     if not os.path.exists(local_path):
         return "File not found on server", 404
@@ -232,13 +241,13 @@ def file_preview_content(file_id):
     # For security, check if file type is safe to preview
     content_type = file_doc.get("content_type", "")
     safe_to_preview = (
-        content_type.startswith("image/") or
-        content_type.startswith("text/") or
-        content_type.startswith("audio/") or
-        content_type.startswith("video/") or
-        content_type == "application/pdf"
+        content_type.startswith("image/")
+        or content_type.startswith("text/")
+        or content_type.startswith("audio/")
+        or content_type.startswith("video/")
+        or content_type == "application/pdf"
     )
-    
+
     if not safe_to_preview:
         return "File type not supported for preview", 400
     

@@ -23,6 +23,7 @@ services:
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME:-admin}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-password}
+      - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME=file-uploads}
     restart: unless-stopped
     networks:
       - default
