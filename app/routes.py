@@ -151,19 +151,22 @@ def verify_password(file_id):
     file_doc = files_collection.find_one({"file_id": file_id})
     if not file_doc:
         return jsonify({"error": "File not found"}), 404
-    
-    return jsonify({
-        "filename": file_doc["filename"],
-        "upload_time": file_doc["upload_time"],
-        "download_count": file_doc.get("download_count", 0),
-        "download_limit": file_doc.get("download_limit", 0),
-        "has_password": bool(file_doc.get("password"))
-    })
+
+    return jsonify(
+        {
+            "filename": file_doc["filename"],
+            "upload_time": file_doc["upload_time"],
+            "download_count": file_doc.get("download_count", 0),
+            "download_limit": file_doc.get("download_limit", 0),
+            "has_password": bool(file_doc.get("password")),
+        }
+    )
+
 
 @main.route("/file/<file_id>")
 def file_info(file_id):
     file_doc = files_collection.find_one({"file_id": file_id})
-    
+
     if not file_doc:
         flash("File not found", "error")
         return redirect(url_for("main.index"))
@@ -184,5 +187,5 @@ def file_info(file_id):
         file_size=format_file_size(file_doc["file_size"]),
         expiration_date=file_doc.get("expiration_date", "Never"),
         download_limit=file_doc.get("download_limit", 0) or "Unlimited",
-        download_url=url_for("main.download", file_id=file_doc["file_id"])
+        download_url=url_for("main.download", file_id=file_doc["file_id"]),
     )
