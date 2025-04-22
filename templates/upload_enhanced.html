@@ -112,6 +112,15 @@
       border-radius: 5px;
       font-size: 16px;
     }
+    .form-group textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 16px;
+      min-height: 80px;
+      resize: vertical;
+    }
     .form-group input[type="date"] {
       font-family: Arial, sans-serif;
     }
@@ -162,6 +171,10 @@
       color: #7f8c8d;
       margin-top: 5px;
     }
+    .file-type-icon {
+      font-size: 36px;
+      margin-right: 10px;
+    }
     @media screen and (max-width: 768px) {
       .upload-container {
         flex-direction: column;
@@ -187,8 +200,15 @@
           </div>
           
           <div id="file-info" class="file-info">
-            <p><strong>File Name:</strong> <span id="file-name"></span></p>
-            <p><strong>File Size:</strong> <span id="file-size"></span></p>
+            <div style="display: flex; align-items: center;">
+              <span id="file-type-icon" class="file-type-icon"><i class="fas fa-file"></i></span>
+              <div>
+                <p><strong>File Name:</strong> <span id="file-name"></span></p>
+                <p><strong>File Size:</strong> <span id="file-size"></span></p>
+                <p><strong>File Type:</strong> <span id="file-type"></span></p>
+              </div>
+            </div>
+            <img id="thumbnail-preview" class="thumbnail-preview" style="max-width: 100%; max-height: 150px; margin-top: 10px; border-radius: 4px; display: none;">
             <button type="button" class="remove-file" id="remove-file">Remove File</button>
           </div>
           
@@ -220,6 +240,12 @@
             <small>Maximum number of downloads allowed (optional)</small>
           </div>
           
+          <div class="form-group">
+            <label for="description">File Description</label>
+            <textarea id="description" name="description" placeholder="Add a description of this file"></textarea>
+            <small>Help recipients understand what this file contains</small>
+          </div>
+          
           <button type="submit" id="submit-btn" class="submit-btn" disabled>Upload File</button>
         </div>
       </div>
@@ -234,6 +260,9 @@
       const fileInfo = document.getElementById('file-info');
       const fileName = document.getElementById('file-name');
       const fileSize = document.getElementById('file-size');
+      const fileType = document.getElementById('file-type');
+      const fileTypeIcon = document.getElementById('file-type-icon');
+      const thumbnailPreview = document.getElementById('thumbnail-preview');
       const removeFile = document.getElementById('remove-file');
       const submitBtn = document.getElementById('submit-btn');
       const progressContainer = document.getElementById('progress-container');
@@ -294,7 +323,39 @@
       function displayFileInfo(file) {
         fileName.textContent = file.name;
         fileSize.textContent = formatFileSize(file.size);
+        fileType.textContent = file.type || 'Unknown';
+        
+        // Set appropriate icon based on file type
+        let iconClass = 'fa-file';
+        
+        if (file.type.includes('image')) {
+          iconClass = 'fa-file-image';
+          // Preview image if it's an image file
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            thumbnailPreview.src = e.target.result;
+            thumbnailPreview.style.display = 'block';
+          };
+          reader.readAsDataURL(file);
+        } else if (file.type.includes('pdf')) {
+          iconClass = 'fa-file-pdf';
+        } else if (file.type.includes('word') || file.name.endsWith('.doc') || file.name.endsWith('.docx')) {
+          iconClass = 'fa-file-word';
+        } else if (file.type.includes('excel') || file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
+          iconClass = 'fa-file-excel';
+        } else if (file.type.includes('video')) {
+          iconClass = 'fa-file-video';
+        } else if (file.type.includes('audio')) {
+          iconClass = 'fa-file-audio';
+        } else if (file.type.includes('zip') || file.type.includes('compressed')) {
+          iconClass = 'fa-file-archive';
+        } else if (file.type.includes('text')) {
+          iconClass = 'fa-file-alt';
+        }
+        
+        fileTypeIcon.innerHTML = `<i class="fas ${iconClass}"></i>`;
         fileInfo.style.display = 'block';
+        thumbnailPreview.style.display = file.type.includes('image') ? 'block' : 'none';
         submitBtn.disabled = false;
       }
       
@@ -313,6 +374,8 @@
       removeFile.addEventListener('click', function() {
         fileInput.value = '';
         fileInfo.style.display = 'none';
+        thumbnailPreview.style.display = 'none';
+        thumbnailPreview.src = '';
         submitBtn.disabled = true;
       });
       
@@ -345,8 +408,13 @@
         xhr.addEventListener('load', function() {
           if (xhr.status >= 200 && xhr.status < 300) {
             // Success - redirect to the URL returned from the server
-            const response = JSON.parse(xhr.responseText);
-            window.location.href = response.redirect_url || '/';
+            try {
+              const response = JSON.parse(xhr.responseText);
+              window.location.href = response.redirect_url || '/';
+            } catch (e) {
+              // If response is not JSON, just redirect to home
+              window.location.href = '/';
+            }
           } else {
             // Error
             alert('Upload failed. Please try again.');
@@ -361,6 +429,7 @@
         
         // Set up and send the request
         xhr.open('POST', uploadForm.action, true);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
         xhr.send(formData);
       });
     });

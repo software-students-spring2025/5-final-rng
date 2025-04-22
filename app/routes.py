@@ -1,97 +1,273 @@
-# Add/modify these imports at the top if needed
-from flask import (
-    Blueprint,
-    request,
-    redirect,
-    url_for,
-    render_template,
-    flash,
-    send_file,
-    jsonify,
-)
-from pymongo import MongoClient
 import os
 import uuid
 from datetime import datetime
 
-# Replace or modify your existing index route to handle the new upload form
-@main.route("/", methods=["GET", "POST"])
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
+from pymongo import MongoClient
+
+main = Blueprint("main", __name__)
+UPLOAD_FOLDER = "uploads"
+
+# Ensure upload folder exists
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+# MongoDB connection
+client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
+db = client["filesharing"]
+files_collection = db["uploads"]
+
+# File type icons mapping
+file_type_icons = {
+    "image": "fa-file-image",
+    "pdf": "fa-file-pdf",
+    "word": "fa-file-word",
+    "excel": "fa-file-excel",
+    "video": "fa-file-video",
+    "audio": "fa-file-audio",
+    "archive": "fa-file-archive",
+    "text": "fa-file-alt",
+    "default": "fa-file",
+}
+
+
+def get_file_icon(filename, content_type):
+    """Determine the appropriate icon based on file type"""
+    if content_type and content_type.startswith("image/"):
+        return file_type_icons["image"]
+    elif content_type and content_type.startswith("video/"):
+        return file_type_icons["video"]
+    elif content_type and content_type.startswith("audio/"):
+        return file_type_icons["audio"]
+    elif content_type and content_type.startswith("application/pdf"):
+        return file_type_icons["pdf"]
+
+    # Check extensions
+    lowercase_name = filename.lower()
+    if lowercase_name.endswith((".doc", ".docx")):
+        return file_type_icons["word"]
+    elif lowercase_name.endswith((".xls", ".xlsx", ".csv")):
+        return file_type_icons["excel"]
+    elif lowercase_name.endswith((".zip", ".rar", ".7z", ".tar", ".gz")):
+        return file_type_icons["archive"]
+    elif lowercase_name.endswith((".txt", ".rtf", ".md")):
+        return file_type_icons["text"]
+
+    return file_type_icons["default"]
+
+
+@main.route("/", methods=["GET"])
 def index():
-    if request.method == "POST":
-        # Check if a file was uploaded
-        if "file" not in request.files:
-            flash("No file part", "error")
-            return jsonify({"success": False, "message": "No file part"}), 400
-        
-        uploaded_file = request.files["file"]
-        
-        # Check if file was selected
-        if uploaded_file.filename == "":
-            flash("No file selected", "error")
-            return jsonify({"success": False, "message": "No file selected"}), 400
-        
-        # Generate a unique ID for the file
-        file_id = str(uuid.uuid4())
-        
-        # Get metadata from the form
-        password = request.form.get("password", "")
-        expiration_date = request.form.get("expiration-date", "")  # Note the hyphen here
-        download_limit = request.form.get("download-limit", "0")  # Note the hyphen here
-        
-        # Convert download_limit to integer
-        try:
-            download_limit = int(download_limit) if download_limit else 0
-        except ValueError:
-            download_limit = 0
-        
-        # Create uploads directory if it doesn't exist
-        if not os.path.exists(UPLOAD_FOLDER):
-            os.makedirs(UPLOAD_FOLDER)
-        
-        # Save the file with a unique name
-        saved_name = f"{file_id}_{uploaded_file.filename}"
-        local_path = os.path.join(UPLOAD_FOLDER, saved_name)
-        uploaded_file.save(local_path)
-        
-        # Save metadata to MongoDB
-        files_collection.insert_one({
-            "file_id": file_id,
-            "filename": uploaded_file.filename,
-            "saved_filename": saved_name,
-            "upload_time": datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
-            "password": password,
-            "expiration_date": expiration_date,
-            "download_limit": download_limit,
-            "download_count": 0,
-            "file_size": os.path.getsize(local_path),
-        })
-        
-        # Handle AJAX requests
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({
+    """Render file upload form"""
+    return render_template("upload_enhanced.html")
+
+
+@main.route("/", methods=["POST"])
+def upload_file():
+    """Handle file upload and metadata"""
+    # Check if a file was uploaded
+    if "file" not in request.files:
+        flash("No file selected", "error")
+        return redirect(request.url)
+
+    file = request.files["file"]
+
+    # Check if file was selected
+    if file.filename == "":
+        flash("No file selected", "error")
+        return redirect(request.url)
+
+    # Generate a unique ID for the file
+    file_id = str(uuid.uuid4())
+
+    # Get metadata from the form
+    password = request.form.get("password", "")
+    expiration_date = request.form.get("expiration-date", "")
+    download_limit = request.form.get("download-limit", "0")
+    description = request.form.get("description", "")
+
+    # Convert download_limit to integer
+    try:
+        download_limit = int(download_limit) if download_limit else 0
+    except ValueError:
+        download_limit = 0
+
+    # Save the file with a unique name
+    original_filename = file.filename
+    saved_name = f"{file_id}_{original_filename}"
+    local_path = os.path.join(UPLOAD_FOLDER, saved_name)
+    file.save(local_path)
+
+    # Get file information
+    file_size = os.path.getsize(local_path)
+    content_type = file.content_type
+    file_icon = get_file_icon(original_filename, content_type)
+
+    # Save metadata to MongoDB
+    file_data = {
+        "file_id": file_id,
+        "original_filename": original_filename,
+        "saved_filename": saved_name,
+        "file_path": local_path,
+        "file_size": file_size,
+        "content_type": content_type,
+        "file_icon": file_icon,
+        "upload_time": datetime.utcnow(),
+        "password": password,
+        "expiration_date": expiration_date,
+        "download_limit": download_limit,
+        "download_count": 0,
+        "description": description,
+    }
+
+    files_collection.insert_one(file_data)
+
+    # Handle AJAX requests
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify(
+            {
                 "success": True,
                 "file_id": file_id,
-                "redirect_url": url_for("main.verify_password", file_id=file_id)
-            })
-        
-        # For non-AJAX requests, redirect to the verification page
-        return redirect(url_for("main.verify_password", file_id=file_id))
-    
-    # GET request - render the upload form
-    return render_template("upload.html")
+                "redirect_url": url_for("main.verify_password", file_id=file_id),
+            }
+        )
 
-# Add a new route to check file status (optional)
-@main.route("/status/<file_id>")
-def file_status(file_id):
+    # For regular form submit, redirect to the verification page
+    return redirect(url_for("main.verify_password", file_id=file_id))
+
+
+@main.route("/file/<file_id>", methods=["GET", "POST"])
+def verify_password(file_id):
+    """Password verification screen"""
     file_doc = files_collection.find_one({"file_id": file_id})
-    
     if not file_doc:
-        return jsonify({"error": "File not found"}), 404
-    
-    return jsonify({
-        "filename": file_doc["filename"],
-        "upload_time": file_doc["upload_time"],
-        "download_count": file_doc.get("download_count", 0),
-        "download_limit": file_doc.get("download_limit", 0),
-        "has_password": bool(file_doc.get("password"))
-    })
+        flash("File not found", "error")
+        return redirect(url_for("main.index"))
+
+    # Check if file is expired
+    if file_doc.get("expiration_date"):
+        try:
+            expiration_date = datetime.strptime(file_doc["expiration_date"], "%Y-%m-%d")
+            if datetime.utcnow() > expiration_date:
+                flash("This file has expired", "error")
+                return redirect(url_for("main.index"))
+        except ValueError:
+            # If date format is invalid, ignore expiration check
+            pass
+
+    # Check if download limit is reached
+    if (
+        file_doc.get("download_limit")
+        and file_doc["download_count"] >= file_doc["download_limit"]
+    ):
+        flash("Download limit reached for this file", "error")
+        return redirect(url_for("main.index"))
+
+    # Handle form submission (password verification)
+    if request.method == "POST":
+        entered_password = request.form.get("password", "")
+
+        # Verify password
+        if file_doc.get("password") and entered_password != file_doc["password"]:
+            flash("Incorrect password", "error")
+            return render_template("verify.html", file_id=file_id)
+
+        # Password is correct, redirect to preview
+        return redirect(url_for("main.file_preview", file_id=file_id))
+
+    # GET request - show password verification form
+    if file_doc.get("password"):
+        return render_template("verify.html", file_id=file_id)
+
+    # No password, go directly to preview
+    return redirect(url_for("main.file_preview", file_id=file_id))
+
+
+@main.route("/preview/<file_id>")
+def file_preview(file_id):
+    """Preview file before downloading"""
+    file_doc = files_collection.find_one({"file_id": file_id})
+    if not file_doc:
+        flash("File not found", "error")
+        return redirect(url_for("main.index"))
+
+    # Render preview template with file details
+    return render_template("preview.html", file=file_doc)
+
+
+@main.route("/download/<file_id>")
+def direct_download(file_id):
+    """Process file download"""
+    file_doc = files_collection.find_one({"file_id": file_id})
+    if not file_doc:
+        flash("File not found", "error")
+        return redirect(url_for("main.index"))
+
+    local_path = file_doc.get("file_path")
+    if not os.path.exists(local_path):
+        flash("File not found on server", "error")
+        return redirect(url_for("main.index"))
+
+    # Increment download counter
+    files_collection.update_one({"file_id": file_id}, {"$inc": {"download_count": 1}})
+
+    # Send the file
+    return send_file(
+        local_path, as_attachment=True, download_name=file_doc.get("original_filename")
+    )
+
+
+@main.route("/preview/content/<file_id>")
+def file_preview_content(file_id):
+    """Serve file content for preview purposes"""
+    file_doc = files_collection.find_one({"file_id": file_id})
+    if not file_doc:
+        return "File not found", 404
+
+    local_path = file_doc.get("file_path")
+    if not os.path.exists(local_path):
+        return "File not found on server", 404
+
+    # For security, check if file type is safe to preview
+    content_type = file_doc.get("content_type", "")
+    safe_to_preview = (
+        content_type.startswith("image/")
+        or content_type.startswith("text/")
+        or content_type.startswith("audio/")
+        or content_type.startswith("video/")
+        or content_type == "application/pdf"
+    )
+
+    if not safe_to_preview:
+        return "File type not supported for preview", 400
+
+    # Serve file for preview
+    return send_file(local_path, mimetype=content_type, as_attachment=False)
+
+
+@main.route("/share/<file_id>")
+def share_page(file_id):
+    """Public share page for a file"""
+    file_doc = files_collection.find_one({"file_id": file_id})
+    if not file_doc:
+        flash("File not found", "error")
+        return redirect(url_for("main.index"))
+
+    # Render share page with file info
+    return render_template(
+        "share.html",
+        file_id=file_id,
+        filename=file_doc.get("original_filename"),
+        file_size=file_doc.get("file_size", 0),
+        file_icon=file_doc.get("file_icon", "fa-file"),
+        has_password=bool(file_doc.get("password")),
+    )
