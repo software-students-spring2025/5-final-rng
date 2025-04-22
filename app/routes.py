@@ -1,6 +1,5 @@
 import os
 from datetime import datetime
-from nanoid import generate
 
 from flask import (
     Blueprint,
@@ -9,9 +8,9 @@ from flask import (
     redirect,
     render_template,
     request,
-    send_file,
     url_for,
 )
+from nanoid import generate
 from pymongo import MongoClient
 
 main = Blueprint("main", __name__)
@@ -137,137 +136,54 @@ def upload_file():
             {
                 "success": True,
                 "file_id": file_id,
-                "redirect_url": url_for("main.verify_password", file_id=file_id),
+                "redirect_url": url_for("main.file_success", file_id=file_id),
             }
         )
 
-    # For regular form submit, redirect to the verification page
-    return redirect(url_for("main.verify_password", file_id=file_id))
+    return redirect(url_for("main.file_success", file_id=file_id))
 
 
-@main.route("/file/<file_id>", methods=["GET", "POST"])
-def verify_password(file_id):
-    """Password verification screen"""
-    file_doc = files_collection.find_one({"file_id": file_id})
+@main.route("/files/<file_id>", methods=["GET", "POST"])
+def access_file(file_id):
+    """Password verification screen and file download handler"""
+    file_doc = files_collection.find_one({"_id": file_id})
     if not file_doc:
-        flash("File not found", "error")
-        return redirect(url_for("main.index"))
+        return jsonify({"error": "File not found"}), 404
 
-    # Check if file is expired
-    if file_doc.get("expiration_date"):
-        try:
-            expiration_date = datetime.strptime(file_doc["expiration_date"], "%Y-%m-%d")
-            if datetime.utcnow() > expiration_date:
-                flash("This file has expired", "error")
-                return redirect(url_for("main.index"))
-        except ValueError:
-            # If date format is invalid, ignore expiration check
-            pass
-
-    # Check if download limit is reached
-    if (
-        file_doc.get("download_limit")
-        and file_doc["download_count"] >= file_doc["download_limit"]
-    ):
-        flash("Download limit reached for this file", "error")
-        return redirect(url_for("main.index"))
-
-    # Handle form submission (password verification)
-    if request.method == "POST":
-        entered_password = request.form.get("password", "")
-
-        # Verify password
-        if file_doc.get("password") and entered_password != file_doc["password"]:
-            flash("Incorrect password", "error")
-            return render_template("verify.html", file_id=file_id)
-
-        # Password is correct, redirect to preview
-        return redirect(url_for("main.file_preview", file_id=file_id))
-
-    # GET request - show password verification form
-    if file_doc.get("password"):
-        return render_template("verify.html", file_id=file_id)
-
-    # No password, go directly to preview
-    return redirect(url_for("main.file_preview", file_id=file_id))
-
-
-@main.route("/preview/<file_id>")
-def file_preview(file_id):
-    """Preview file before downloading"""
-    file_doc = files_collection.find_one({"file_id": file_id})
-    if not file_doc:
-        flash("File not found", "error")
-        return redirect(url_for("main.index"))
-
-    # Render preview template with file details
-    return render_template("preview.html", file=file_doc)
-
-
-@main.route("/download/<file_id>")
-def direct_download(file_id):
-    """Process file download"""
-    file_doc = files_collection.find_one({"file_id": file_id})
-    if not file_doc:
-        flash("File not found", "error")
-        return redirect(url_for("main.index"))
-
-    local_path = file_doc.get("file_path")
-    if not os.path.exists(local_path):
-        flash("File not found on server", "error")
-        return redirect(url_for("main.index"))
-
-    # Increment download counter
-    files_collection.update_one({"file_id": file_id}, {"$inc": {"download_count": 1}})
-
-    # Send the file
-    return send_file(
-        local_path, as_attachment=True, download_name=file_doc.get("original_filename")
+    return jsonify(
+        {
+            "filename": file_doc["filename"],
+            "upload_time": file_doc["upload_time"],
+            "download_count": file_doc.get("download_count", 0),
+            "download_limit": file_doc.get("download_limit", 0),
+            "has_password": bool(file_doc.get("password")),
+        }
     )
 
 
-@main.route("/preview/content/<file_id>")
-def file_preview_content(file_id):
-    """Serve file content for preview purposes"""
-    file_doc = files_collection.find_one({"file_id": file_id})
-    if not file_doc:
-        return "File not found", 404
+@main.route("/files/<file_id>/success")
+def file_success(file_id):
+    file_doc = files_collection.find_one({"_id": file_id})
 
-    local_path = file_doc.get("file_path")
-    if not os.path.exists(local_path):
-        return "File not found on server", 404
-
-    # For security, check if file type is safe to preview
-    content_type = file_doc.get("content_type", "")
-    safe_to_preview = (
-        content_type.startswith("image/")
-        or content_type.startswith("text/")
-        or content_type.startswith("audio/")
-        or content_type.startswith("video/")
-        or content_type == "application/pdf"
-    )
-
-    if not safe_to_preview:
-        return "File type not supported for preview", 400
-
-    # Serve file for preview
-    return send_file(local_path, mimetype=content_type, as_attachment=False)
-
-
-@main.route("/share/<file_id>")
-def share_page(file_id):
-    """Public share page for a file"""
-    file_doc = files_collection.find_one({"file_id": file_id})
     if not file_doc:
         flash("File not found", "error")
         return redirect(url_for("main.index"))
 
-    # Render share page with file info
+    # Format file size to human readable
+    def format_file_size(size_bytes):
+        if size_bytes < 1024:
+            return f"{size_bytes} bytes"
+        elif size_bytes < 1048576:
+            return f"{size_bytes / 1024:.1f} KB"
+        else:
+            return f"{size_bytes / 1048576:.1f} MB"
+
     return render_template(
-        "share.html",
-        file_id=file_id,
-        filename=file_doc.get("original_filename"),
-        file_size=file_doc.get("file_size", 0),
-        file_icon=file_doc.get("file_icon", "fa-file"),
-        has_password=bool(file_doc.get("password")),
+        "success.html",
+        file_id=file_doc["_id"],
+        file_name=file_doc["original_filename"],
+        file_size=format_file_size(file_doc["file_size"]),
+        expiration_date=file_doc.get("expiration_date", "Never"),
+        download_limit=file_doc.get("download_limit", 0) or "Unlimited",
+        download_url=url_for("main.access_file", file_id=file_doc["_id"]),
     )
