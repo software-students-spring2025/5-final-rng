@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Upload Successful</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f0f2f5;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      padding: 30px;
+      text-align: center;
+    }
+    h1 {
+      color: #2ecc71;
+      margin-bottom: 10px;
+    }
+    .success-icon {
+      font-size: 60px;
+      color: #2ecc71;
+      margin-bottom: 15px;
+    }
+    .info {
+      color: #555;
+      margin-bottom: 30px;
+      font-size: 16px;
+    }
+    .file-details {
+      background-color: #f9f9f9;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 30px;
+      text-align: left;
+    }
+    .file-details p {
+      margin: 8px 0;
+      color: #333;
+    }
+    .download-link {
+      display: inline-block;
+      background-color: #3498db;
+      color: white;
+      text-decoration: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      transition: background-color 0.3s;
+    }
+    .download-link:hover {
+      background-color: #2980b9;
+    }
+    .footer-note {
+      font-size: 13px;
+      color: #888;
+      margin-top: 20px;
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="container">
+    <i class="fas fa-check-circle success-icon"></i>
+    <h1>Upload Successful!</h1>
+    <p class="info">Your file has been uploaded securely. Share the link below with the recipient.</p>
+    
+    <div class="file-details">
+      <p><strong>File Name:</strong> {{ file_name }}</p>
+      <p><strong>File Size:</strong> {{ file_size }}</p>
+      <p><strong>Expires:</strong> {{ expiration_date or 'No expiration' }}</p>
+      <p><strong>Download Limit:</strong> {{ download_limit or 'Unlimited' }}</p>
+    </div>
+
+    <a href="{{ download_url }}" class="download-link" download>Download File</a>
+
+    <!-- ✅ Copy Link Button -->
+<button onclick="copyToClipboard()" class="download-link" style="background-color: #f39c12; margin-left: 10px;">
+  Copy Link
+</button>
+
+<p class="footer-note">Keep the password secure. The file can't be accessed without it.</p>
+
+<!-- ✅ Hidden input to hold the URL -->
+<input type="text" id="copy-link" value="{{ download_url }}" style="position:absolute; left:-9999px;">
+
+  </div>
+  <script>
+    function copyToClipboard() {
+      const copyText = document.getElementById("copy-link");
+      copyText.select();
+      copyText.setSelectionRange(0, 99999); // For mobile devices
+  
+      try {
+        document.execCommand("copy");
+        alert("Link copied to clipboard!");
+      } catch (err) {
+        alert("Failed to copy. Please copy manually.");
+      }
+    }
+  </script>
+  
+</body>
+</html>

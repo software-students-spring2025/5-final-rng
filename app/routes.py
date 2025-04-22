@@ -95,3 +95,30 @@ def file_status(file_id):
         "download_limit": file_doc.get("download_limit", 0),
         "has_password": bool(file_doc.get("password"))
     })
+
+@main.route("/file/<file_id>")
+def file_info(file_id):
+    file_doc = files_collection.find_one({"file_id": file_id})
+    
+    if not file_doc:
+        flash("File not found", "error")
+        return redirect(url_for("main.index"))
+
+    # Format file size to human readable
+    def format_file_size(size_bytes):
+        if size_bytes < 1024:
+            return f"{size_bytes} bytes"
+        elif size_bytes < 1048576:
+            return f"{size_bytes / 1024:.1f} KB"
+        else:
+            return f"{size_bytes / 1048576:.1f} MB"
+
+    return render_template(
+        "success.html",
+        file_id=file_doc["file_id"],
+        file_name=file_doc["filename"],
+        file_size=format_file_size(file_doc["file_size"]),
+        expiration_date=file_doc.get("expiration_date", "Never"),
+        download_limit=file_doc.get("download_limit", 0) or "Unlimited",
+        download_url=url_for("main.download", file_id=file_doc["file_id"])
+    )
