@@ -1,18 +1,18 @@
-from flask import (
-    Blueprint,
-    request,
-    redirect,
-    url_for,
-    render_template,
-    flash,
-    send_file,
-    jsonify
-)
-from pymongo import MongoClient
 import os
-import smtplib
 import uuid
 from datetime import datetime
+
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
+from pymongo import MongoClient
 
 main = Blueprint("main", __name__)
 UPLOAD_FOLDER = "uploads"
@@ -36,7 +36,7 @@ file_type_icons = {
     "audio": "fa-file-audio",
     "archive": "fa-file-archive",
     "text": "fa-file-alt",
-    "default": "fa-file"
+    "default": "fa-file",
 }
 
 
@@ -61,8 +61,9 @@ def get_file_icon(filename, content_type):
         return file_type_icons["archive"]
     elif lowercase_name.endswith((".txt", ".rtf", ".md")):
         return file_type_icons["text"]
-    
+
     return file_type_icons["default"]
+
 
 @main.route("/", methods=["GET"])
 def index():
@@ -79,7 +80,7 @@ def upload_file():
         return redirect(request.url)
 
     file = request.files["file"]
-    
+
     # Check if file was selected
     if file.filename == "":
         flash("No file selected", "error")
@@ -93,7 +94,7 @@ def upload_file():
     expiration_date = request.form.get("expiration-date", "")
     download_limit = request.form.get("download-limit", "0")
     description = request.form.get("description", "")
-    
+
     # Convert download_limit to integer
     try:
         download_limit = int(download_limit) if download_limit else 0
@@ -105,12 +106,12 @@ def upload_file():
     saved_name = f"{file_id}_{original_filename}"
     local_path = os.path.join(UPLOAD_FOLDER, saved_name)
     file.save(local_path)
-    
+
     # Get file information
     file_size = os.path.getsize(local_path)
     content_type = file.content_type
     file_icon = get_file_icon(original_filename, content_type)
-    
+
     # Save metadata to MongoDB
     file_data = {
         "file_id": file_id,
@@ -125,19 +126,21 @@ def upload_file():
         "expiration_date": expiration_date,
         "download_limit": download_limit,
         "download_count": 0,
-        "description": description
+        "description": description,
     }
 
     files_collection.insert_one(file_data)
 
     # Handle AJAX requests
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return jsonify({
-            "success": True,
-            "file_id": file_id,
-            "redirect_url": url_for("main.verify_password", file_id=file_id)
-        })
-    
+        return jsonify(
+            {
+                "success": True,
+                "file_id": file_id,
+                "redirect_url": url_for("main.verify_password", file_id=file_id),
+            }
+        )
+
     # For regular form submit, redirect to the verification page
     return redirect(url_for("main.verify_password", file_id=file_id))
 
@@ -177,14 +180,14 @@ def verify_password(file_id):
         if file_doc.get("password") and entered_password != file_doc["password"]:
             flash("Incorrect password", "error")
             return render_template("verify.html", file_id=file_id)
-        
+
         # Password is correct, redirect to preview
         return redirect(url_for("main.file_preview", file_id=file_id))
-    
+
     # GET request - show password verification form
     if file_doc.get("password"):
         return render_template("verify.html", file_id=file_id)
-    
+
     # No password, go directly to preview
     return redirect(url_for("main.file_preview", file_id=file_id))
 
@@ -213,19 +216,15 @@ def direct_download(file_id):
     if not os.path.exists(local_path):
         flash("File not found on server", "error")
         return redirect(url_for("main.index"))
-    
+
     # Increment download counter
-    files_collection.update_one(
-        {"file_id": file_id},
-        {"$inc": {"download_count": 1}}
-    )
-    
+    files_collection.update_one({"file_id": file_id}, {"$inc": {"download_count": 1}})
+
     # Send the file
     return send_file(
-        local_path,
-        as_attachment=True,
-        download_name=file_doc.get("original_filename")
+        local_path, as_attachment=True, download_name=file_doc.get("original_filename")
     )
+
 
 @main.route("/preview/content/<file_id>")
 def file_preview_content(file_id):
@@ -237,7 +236,7 @@ def file_preview_content(file_id):
     local_path = file_doc.get("file_path")
     if not os.path.exists(local_path):
         return "File not found on server", 404
-    
+
     # For security, check if file type is safe to preview
     content_type = file_doc.get("content_type", "")
     safe_to_preview = (
@@ -250,13 +249,10 @@ def file_preview_content(file_id):
 
     if not safe_to_preview:
         return "File type not supported for preview", 400
-    
+
     # Serve file for preview
-    return send_file(
-        local_path,
-        mimetype=content_type,
-        as_attachment=False
-    )
+    return send_file(local_path, mimetype=content_type, as_attachment=False)
+
 
 @main.route("/share/<file_id>")
 def share_page(file_id):
@@ -265,12 +261,13 @@ def share_page(file_id):
     if not file_doc:
         flash("File not found", "error")
         return redirect(url_for("main.index"))
-    
+
     # Render share page with file info
-    return render_template("share.html", 
+    return render_template(
+        "share.html",
         file_id=file_id,
         filename=file_doc.get("original_filename"),
         file_size=file_doc.get("file_size", 0),
         file_icon=file_doc.get("file_icon", "fa-file"),
-        has_password=bool(file_doc.get("password"))
+        has_password=bool(file_doc.get("password")),
     )
