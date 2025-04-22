@@ -9,6 +9,7 @@ python-dotenv = "*"
 pymongo = "*"
 ruff = "*"
 pytest = "*"
+nanoid = "*"
 
 [dev-packages]
 

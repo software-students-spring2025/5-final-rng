@@ -1,6 +1,6 @@
 import os
-import uuid
 from datetime import datetime
+from nanoid import generate
 
 from flask import (
     Blueprint,
@@ -87,7 +87,7 @@ def upload_file():
         return redirect(request.url)
 
     # Generate a unique ID for the file
-    file_id = str(uuid.uuid4())
+    file_id = generate()
 
     # Get metadata from the form
     password = request.form.get("password", "")
@@ -114,7 +114,7 @@ def upload_file():
 
     # Save metadata to MongoDB
     file_data = {
-        "file_id": file_id,
+        "_id": file_id,
         "original_filename": original_filename,
         "saved_filename": saved_name,
         "file_path": local_path,
