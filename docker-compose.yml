@@ -12,6 +12,7 @@ services:
       - .env
     depends_on:
       - mongodb
+      - minio
 
   mongodb:
     image: mongodb/mongodb-community-server:latest
