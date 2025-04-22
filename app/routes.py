@@ -1,24 +1,24 @@
-from flask import (
-    Blueprint,
-    request,
-    redirect,
-    url_for,
-    render_template,
-    flash,
-    send_file,
-    jsonify,
-    session
-)
-from pymongo import MongoClient
+import hashlib
 import os
+import smtplib
 import uuid
 from datetime import datetime
-import hashlib
-import smtplib
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 from dotenv import load_dotenv
-import json
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
+from pymongo import MongoClient
 
 # Load environment variables
 load_dotenv()
@@ -48,8 +48,9 @@ file_type_icons = {
     "archive": "fa-file-archive",
     "text": "fa-file-alt",
     "code": "fa-file-code",
-    "default": "fa-file"
+    "default": "fa-file",
 }
+
 
 def get_file_icon(filename, content_type):
     """Determine the appropriate Font Awesome icon based on file type"""
@@ -61,7 +62,7 @@ def get_file_icon(filename, content_type):
         return file_type_icons["audio"]
     elif content_type and content_type.startswith("application/pdf"):
         return file_type_icons["pdf"]
-    
+
     # Check extensions
     lowercase_name = filename.lower()
     if lowercase_name.endswith((".doc", ".docx")):
@@ -74,14 +75,17 @@ def get_file_icon(filename, content_type):
         return file_type_icons["archive"]
     elif lowercase_name.endswith((".txt", ".rtf", ".md")):
         return file_type_icons["text"]
-    elif lowercase_name.endswith((".js", ".py", ".html", ".css", ".php", ".java", ".c", ".cpp")):
+    elif lowercase_name.endswith(
+        (".js", ".py", ".html", ".css", ".php", ".java", ".c", ".cpp")
+    ):
         return file_type_icons["code"]
-    
+
     return file_type_icons["default"]
+
 
 def encrypt_file(file_path, encryption_level="standard"):
     """Simulated file encryption function
-    
+
     In a real implementation, this would use different encryption methods
     based on the encryption_level parameter.
     """
@@ -89,35 +93,37 @@ def encrypt_file(file_path, encryption_level="standard"):
     # but in a real scenario, we'd encrypt with appropriate strength
     return file_path
 
+
 def send_notification_email(email, message):
     """Send notification email"""
     if not email or not os.getenv("SMTP_SERVER"):
         return False
-    
+
     try:
         smtp_server = os.getenv("SMTP_SERVER")
         smtp_port = int(os.getenv("SMTP_PORT", 587))
         smtp_username = os.getenv("SMTP_USERNAME")
         smtp_password = os.getenv("SMTP_PASSWORD")
-        
+
         msg = MIMEMultipart()
         msg["From"] = os.getenv("EMAIL_FROM", "noreply@fileapp.com")
         msg["To"] = email
         msg["Subject"] = "File Sharing Notification"
-        
+
         msg.attach(MIMEText(message, "plain"))
-        
+
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
         server.login(smtp_username, smtp_password)
         server.send_message(msg)
         server.quit()
-        
+
         return True
     except Exception as e:
         # Log the error but don't crash the application
         print(f"Email notification error: {str(e)}")
         return False
+
 
 @main.route("/", methods=["GET"])
 def index():
@@ -793,6 +799,7 @@ def index():
 </html>
     """
 
+
 @main.route("/", methods=["POST"])
 def upload_file():
     """Handle file upload and metadata"""
@@ -802,25 +809,25 @@ def upload_file():
             return jsonify({"success": False, "message": "No file part"}), 400
         flash("No file part", "error")
         return redirect(request.url)
-    
+
     file = request.files["file"]
-    
+
     # Check if a file was selected
     if file.filename == "":
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"success": False, "message": "No file selected"}), 400
         flash("No file selected", "error")
         return redirect(request.url)
-    
+
     # Generate a unique ID for the file
     file_id = str(uuid.uuid4())
-    
+
     # Get metadata from the form
     password = request.form.get("password", "")
     expiration_date = request.form.get("expiration-date", "")  # Note the hyphen
     download_limit = request.form.get("download-limit", "0")  # Note the hyphen
     description = request.form.get("description", "")
-    
+
     # Advanced options
     filename_override = request.form.get("filename-override", "")
     encryption_level = request.form.get("encryption-level", "standard")
@@ -829,35 +836,35 @@ def upload_file():
     self_destruct = "self-destruct" in request.form
     notify_download = "notify-download" in request.form
     notification_email = request.form.get("notification-email", "")
-    
+
     # Convert download_limit to integer
     try:
         download_limit = int(download_limit) if download_limit else 0
     except ValueError:
         download_limit = 0
-    
+
     # Save the file with a unique name
     original_filename = file.filename
     display_filename = filename_override or original_filename
     saved_name = f"{file_id}_{original_filename}"
     local_path = os.path.join(UPLOAD_FOLDER, saved_name)
     file.save(local_path)
-    
+
     # Encrypt file if encryption is enabled
     if encryption_level != "standard":
         local_path = encrypt_file(local_path, encryption_level)
-    
+
     # Get file information
     file_size = os.path.getsize(local_path)
     content_type = file.content_type
     file_icon = get_file_icon(original_filename, content_type)
-    
+
     # Create a hash of the file for integrity verification
     file_hash = ""
     if os.path.exists(local_path):
         with open(local_path, "rb") as f:
             file_hash = hashlib.md5(f.read()).hexdigest()
-    
+
     # Save metadata to MongoDB
     file_data = {
         "file_id": file_id,
@@ -882,20 +889,23 @@ def upload_file():
         "notify_download": notify_download,
         "notification_email": notification_email if notify_download else "",
     }
-    
+
     files_collection.insert_one(file_data)
-    
+
     # Handle AJAX requests
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return jsonify({
-            "success": True,
-            "file_id": file_id,
-            "message": "File uploaded successfully",
-            "redirect_url": url_for("main.verify_password", file_id=file_id)
-        })
-    
+        return jsonify(
+            {
+                "success": True,
+                "file_id": file_id,
+                "message": "File uploaded successfully",
+                "redirect_url": url_for("main.verify_password", file_id=file_id),
+            }
+        )
+
     # For regular form submit, redirect to success page
     return redirect(url_for("main.verify_password", file_id=file_id))
+
 
 @main.route("/file/<file_id>", methods=["GET", "POST"])
 def verify_password(file_id):
@@ -904,7 +914,7 @@ def verify_password(file_id):
     if not file_doc:
         flash("File not found", "error")
         return redirect(url_for("main.index"))
-    
+
     # Check if file is expired
     if file_doc.get("expiration_date"):
         try:
@@ -915,54 +925,60 @@ def verify_password(file_id):
         except ValueError:
             # If date format is invalid, just ignore expiration check
             pass
-    
+
     # Check if download limit is reached
-    if file_doc.get("download_limit") and file_doc["download_count"] >= file_doc["download_limit"]:
+    if (
+        file_doc.get("download_limit")
+        and file_doc["download_count"] >= file_doc["download_limit"]
+    ):
         flash("Download limit reached for this file", "error")
         return redirect(url_for("main.index"))
-    
+
     # Handle form submission (password verification)
     if request.method == "POST":
         entered_password = request.form.get("password", "")
-        
+
         # Verify password
         if file_doc.get("password") and entered_password != file_doc["password"]:
             flash("Incorrect password", "error")
             return render_template("verify.html", file_id=file_id)
-        
+
         # If collect_recipient_data is enabled, collect email before download
         if file_doc.get("collect_recipient_data"):
             recipient_email = request.form.get("recipient_email", "")
             if not recipient_email:
                 # If no email provided, show email collection form
                 return render_template("collect_email.html", file_id=file_id)
-            
+
             # Save the recipient email in the session for logging
             session["recipient_email"] = recipient_email
-        
+
         # Password is correct, redirect to download or preview page
         if file_doc.get("allow_preview", True):
             return redirect(url_for("main.file_preview", file_id=file_id))
         else:
             # Direct download
             return redirect(url_for("main.direct_download", file_id=file_id))
-    
+
     # GET request - show password verification form
-    collect_email = file_doc.get("collect_recipient_data", False) and not file_doc.get("password")
-    
+    collect_email = file_doc.get("collect_recipient_data", False) and not file_doc.get(
+        "password"
+    )
+
     if collect_email:
         # If no password but email collection is enabled, show email form
         return render_template("collect_email.html", file_id=file_id)
-    
+
     # Show password form if password is set
     if file_doc.get("password"):
         return render_template("verify.html", file_id=file_id)
-    
+
     # No password and no email collection, go directly to download/preview
     if file_doc.get("allow_preview", True):
         return redirect(url_for("main.file_preview", file_id=file_id))
     else:
         return redirect(url_for("main.direct_download", file_id=file_id))
+
 
 @main.route("/preview/<file_id>")
 def file_preview(file_id):
@@ -971,9 +987,10 @@ def file_preview(file_id):
     if not file_doc:
         flash("File not found", "error")
         return redirect(url_for("main.index"))
-    
+
     # Render preview template with file details
     return render_template("preview.html", file=file_doc)
+
 
 @main.route("/download/<file_id>")
 def direct_download(file_id):
@@ -982,55 +999,55 @@ def direct_download(file_id):
     if not file_doc:
         flash("File not found", "error")
         return redirect(url_for("main.index"))
-    
+
     local_path = file_doc.get("file_path")
     if not os.path.exists(local_path):
         flash("File not found on server", "error")
         return redirect(url_for("main.index"))
-    
+
     # Log the download
     download_info = {
         "file_id": file_id,
         "download_time": datetime.utcnow(),
         "ip_address": request.remote_addr,
         "user_agent": request.user_agent.string,
-        "recipient_email": session.get("recipient_email", "")
+        "recipient_email": session.get("recipient_email", ""),
     }
     download_logs.insert_one(download_info)
-    
+
     # Increment download counter
-    files_collection.update_one(
-        {"file_id": file_id},
-        {"$inc": {"download_count": 1}}
-    )
-    
+    files_collection.update_one({"file_id": file_id}, {"$inc": {"download_count": 1}})
+
     # Send notification if enabled
     if file_doc.get("notify_download") and file_doc.get("notification_email"):
-        file_name = file_doc.get("display_filename") or file_doc.get("original_filename")
+        file_name = file_doc.get("display_filename") or file_doc.get(
+            "original_filename"
+        )
         message = f"Your file '{file_name}' was downloaded on {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}."
-        
+
         if download_info.get("recipient_email"):
             message += f"\nRecipient email: {download_info['recipient_email']}"
-            
+
         send_notification_email(file_doc["notification_email"], message)
-    
+
     # If this is a self-destruct file, mark for deletion after download
     if file_doc.get("self_destruct"):
         files_collection.update_one(
-            {"file_id": file_id},
-            {"$set": {"marked_for_deletion": True}}
+            {"file_id": file_id}, {"$set": {"marked_for_deletion": True}}
         )
-    
+
     # Clear session data
     if "recipient_email" in session:
         session.pop("recipient_email")
-    
+
     # Send the file
     return send_file(
         local_path,
         as_attachment=True,
-        download_name=file_doc.get("display_filename") or file_doc.get("original_filename")
+        download_name=file_doc.get("display_filename")
+        or file_doc.get("original_filename"),
     )
+
 
 @main.route("/api/file-info/<file_id>")
 def file_info_api(file_id):
@@ -1038,10 +1055,11 @@ def file_info_api(file_id):
     file_doc = files_collection.find_one({"file_id": file_id})
     if not file_doc:
         return jsonify({"error": "File not found"}), 404
-    
+
     # Return only non-sensitive file details
     file_info = {
-        "filename": file_doc.get("display_filename") or file_doc.get("original_filename"),
+        "filename": file_doc.get("display_filename")
+        or file_doc.get("original_filename"),
         "file_size": file_doc.get("file_size"),
         "content_type": file_doc.get("content_type"),
         "upload_time": file_doc.get("upload_time"),
@@ -1052,8 +1070,9 @@ def file_info_api(file_id):
         "file_icon": file_doc.get("file_icon", "fa-file"),
         "allow_preview": file_doc.get("allow_preview", True),
     }
-    
+
     return jsonify(file_info)
+
 
 # Maintenance route to clean up expired files (would be called by a cron job)
 @main.route("/maintenance/cleanup", methods=["POST"])
@@ -1063,17 +1082,19 @@ def cleanup_files():
     api_key = request.headers.get("X-API-Key")
     if not api_key or api_key != os.getenv("MAINTENANCE_API_KEY"):
         return jsonify({"error": "Unauthorized"}), 401
-    
+
     current_date = datetime.utcnow().strftime("%Y-%m-%d")
-    
+
     # Find expired files
-    expired_files = files_collection.find({
-        "$or": [
-            {"expiration_date": {"$lt": current_date}},
-            {"marked_for_deletion": True}
-        ]
-    })
-    
+    expired_files = files_collection.find(
+        {
+            "$or": [
+                {"expiration_date": {"$lt": current_date}},
+                {"marked_for_deletion": True},
+            ]
+        }
+    )
+
     deleted_count = 0
     for file in expired_files:
         # Delete the actual file
@@ -1082,18 +1103,21 @@ def cleanup_files():
                 os.remove(file.get("file_path"))
         except Exception as e:
             print(f"Error deleting file {file.get('file_id')}: {str(e)}")
-        
+
         # Remove from database
         files_collection.delete_one({"_id": file["_id"]})
         deleted_count += 1
-    
-    return jsonify({
-        "success": True,
-        "deleted_count": deleted_count,
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-    })
+
+    return jsonify(
+        {
+            "success": True,
+            "deleted_count": deleted_count,
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+    )
 
     # Add this route to routes_extended.py
+
 
 @main.route("/preview/content/<file_id>")
 def file_preview_content(file_id):
@@ -1101,31 +1125,28 @@ def file_preview_content(file_id):
     file_doc = files_collection.find_one({"file_id": file_id})
     if not file_doc:
         return "File not found", 404
-    
+
     local_path = file_doc.get("file_path")
     if not os.path.exists(local_path):
         return "File not found on server", 404
-    
+
     # For security, we should check if the file type is safe to preview
     # This is a simplified version - in production, you'd want more thorough checks
     content_type = file_doc.get("content_type", "")
     safe_to_preview = (
-        content_type.startswith("image/") or
-        content_type.startswith("text/") or
-        content_type.startswith("audio/") or
-        content_type.startswith("video/") or
-        content_type == "application/pdf"
+        content_type.startswith("image/")
+        or content_type.startswith("text/")
+        or content_type.startswith("audio/")
+        or content_type.startswith("video/")
+        or content_type == "application/pdf"
     )
-    
+
     if not safe_to_preview:
         return "File type not supported for preview", 400
-    
+
     # If file should be safe to preview, serve it inline
-    return send_file(
-        local_path,
-        mimetype=content_type,
-        as_attachment=False
-    )
+    return send_file(local_path, mimetype=content_type, as_attachment=False)
+
 
 @main.route("/stats/files")
 def file_stats():
@@ -1134,16 +1155,16 @@ def file_stats():
     api_key = request.headers.get("X-API-Key")
     if not api_key or api_key != os.getenv("MAINTENANCE_API_KEY"):
         return "Unauthorized", 401
-    
+
     # Get statistics from MongoDB
     total_files = files_collection.count_documents({})
     total_downloads = download_logs.count_documents({})
-    
+
     # Get total storage used
     total_size = 0
     for file in files_collection.find({}, {"file_size": 1}):
         total_size += file.get("file_size", 0)
-    
+
     # Format total size
     if total_size < 1024:
         formatted_size = f"{total_size} bytes"
@@ -1151,21 +1172,24 @@ def file_stats():
         formatted_size = f"{total_size / 1024:.2f} KB"
     else:
         formatted_size = f"{total_size / (1024 * 1024):.2f} MB"
-    
+
     # Get file types distribution
     file_types = {}
     for file in files_collection.find({}, {"content_type": 1}):
         content_type = file.get("content_type", "unknown")
         main_type = content_type.split("/")[0] if "/" in content_type else content_type
         file_types[main_type] = file_types.get(main_type, 0) + 1
-    
-    return jsonify({
-        "total_files": total_files,
-        "total_downloads": total_downloads,
-        "total_storage": formatted_size,
-        "file_types": file_types,
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-    })
+
+    return jsonify(
+        {
+            "total_files": total_files,
+            "total_downloads": total_downloads,
+            "total_storage": formatted_size,
+            "file_types": file_types,
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+    )
+
 
 @main.route("/history/<days>")
 def download_history(days):
@@ -1174,46 +1198,49 @@ def download_history(days):
         days = int(days)
     except ValueError:
         days = 7  # Default to one week
-    
+
     # This should be protected with authentication in production
     api_key = request.headers.get("X-API-Key")
     if not api_key or api_key != os.getenv("MAINTENANCE_API_KEY"):
         return jsonify({"error": "Unauthorized"}), 401
-    
+
     # Calculate date range
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=days)
-    
+
     # Query MongoDB for download history
-    downloads = download_logs.find({
-        "download_time": {"$gte": start_date, "$lte": end_date}
-    }).sort("download_time", -1)  # Sort by newest first
-    
+    downloads = download_logs.find(
+        {"download_time": {"$gte": start_date, "$lte": end_date}}
+    ).sort("download_time", -1)  # Sort by newest first
+
     # Format results
     history = []
     for download in downloads:
         # Get file info
         file_id = download.get("file_id")
         file_info = files_collection.find_one({"file_id": file_id})
-        
+
         if file_info:
-            file_name = file_info.get("display_filename") or file_info.get("original_filename")
+            file_name = file_info.get("display_filename") or file_info.get(
+                "original_filename"
+            )
         else:
             file_name = "File no longer exists"
-        
-        history.append({
-            "file_id": file_id,
-            "file_name": file_name,
-            "download_time": download.get("download_time").strftime("%Y-%m-%d %H:%M:%S"),
-            "ip_address": download.get("ip_address"),
-            "recipient_email": download.get("recipient_email", "Not provided")
-        })
-    
-    return jsonify({
-        "history": history,
-        "days": days,
-        "total_records": len(history)
-    })
+
+        history.append(
+            {
+                "file_id": file_id,
+                "file_name": file_name,
+                "download_time": download.get("download_time").strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
+                "ip_address": download.get("ip_address"),
+                "recipient_email": download.get("recipient_email", "Not provided"),
+            }
+        )
+
+    return jsonify({"history": history, "days": days, "total_records": len(history)})
+
 
 @main.route("/share/<file_id>")
 def share_page(file_id):
@@ -1222,7 +1249,7 @@ def share_page(file_id):
     if not file_doc:
         flash("File not found", "error")
         return redirect(url_for("main.index"))
-    
+
     # Check if file is expired
     if file_doc.get("expiration_date"):
         try:
@@ -1232,34 +1259,40 @@ def share_page(file_id):
         except ValueError:
             # If date format is invalid, just ignore expiration check
             pass
-    
+
     # Check if download limit is reached
-    if file_doc.get("download_limit") and file_doc["download_count"] >= file_doc["download_limit"]:
+    if (
+        file_doc.get("download_limit")
+        and file_doc["download_count"] >= file_doc["download_limit"]
+    ):
         return render_template("limit_reached.html")
-    
+
     # Render share page with minimal file info
-    return render_template("share.html", 
+    return render_template(
+        "share.html",
         file_id=file_id,
         filename=file_doc.get("display_filename") or file_doc.get("original_filename"),
         file_size=file_doc.get("file_size", 0),
         file_icon=file_doc.get("file_icon", "fa-file"),
         has_password=bool(file_doc.get("password")),
-        collect_email=file_doc.get("collect_recipient_data", False)
+        collect_email=file_doc.get("collect_recipient_data", False),
     )
+
 
 @main.route("/generate_qr/<file_id>")
 def generate_qr(file_id):
     """Generate QR code for file sharing"""
-    import qrcode
     from io import BytesIO
-    
+
+    import qrcode
+
     file_doc = files_collection.find_one({"file_id": file_id})
     if not file_doc:
         return "File not found", 404
-    
+
     # Create the sharing URL
     share_url = url_for("main.share_page", file_id=file_id, _external=True)
-    
+
     # Generate QR code
     qr = qrcode.QRCode(
         version=1,
@@ -1269,13 +1302,13 @@ def generate_qr(file_id):
     )
     qr.add_data(share_url)
     qr.make(fit=True)
-    
+
     img = qr.make_image(fill_color="black", back_color="white")
-    
+
     # Save to memory buffer
     buffer = BytesIO()
     img.save(buffer, format="PNG")
     buffer.seek(0)
-    
+
     # Return image
     return send_file(buffer, mimetype="image/png")
