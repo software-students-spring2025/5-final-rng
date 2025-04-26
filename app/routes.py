@@ -150,14 +150,13 @@ def access_file(file_id):
     if not file_doc:
         return jsonify({"error": "File not found"}), 404
 
-    return jsonify(
-        {
-            "filename": file_doc["filename"],
-            "upload_time": file_doc["upload_time"],
-            "download_count": file_doc.get("download_count", 0),
-            "download_limit": file_doc.get("download_limit", 0),
-            "has_password": bool(file_doc.get("password")),
-        }
+    return render_template(
+        "verify.html",
+        file_id=file_doc["_id"],
+        filename=file_doc["original_filename"],
+        has_password=bool(file_doc.get("password")),
+        download_limit=file_doc.get("download_limit", 0),
+        download_count=file_doc.get("download_count", 0),
     )
 
 
@@ -185,5 +184,5 @@ def file_success(file_id):
         file_size=format_file_size(file_doc["file_size"]),
         expiration_date=file_doc.get("expiration_date", "Never"),
         download_limit=file_doc.get("download_limit", 0) or "Unlimited",
-        download_url=url_for("main.access_file", file_id=file_doc["_id"]),
+        download_url=url_for("main.access_file", file_id=file_doc["_id"], _external=True),
     )
