@@ -14,7 +14,7 @@ from nanoid import generate
 from pymongo import MongoClient
 
 main = Blueprint("main", __name__)
-UPLOAD_FOLDER = "uploads"
+UPLOAD_FOLDER = "dropit_uploads"
 
 # Ensure upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
@@ -22,8 +22,8 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 # MongoDB connection
 client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
-db = client["filesharing"]
-files_collection = db["uploads"]
+db = client["dropit"]
+files_collection = db["files"]
 
 # File type icons mapping
 file_type_icons = {
