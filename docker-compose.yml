@@ -2,7 +2,7 @@ services:
   app:
     build:
       dockerfile: Dockerfile
-    container_name: app
+    container_name: dropit-app
     ports:
       - "3000:3000"
     restart: unless-stopped
@@ -16,7 +16,7 @@ services:
 
   mongodb:
     image: mongodb/mongodb-community-server:latest
-    container_name: db
+    container_name: dropit-db
     ports:
       - "27017:27017"
     volumes:
@@ -32,7 +32,7 @@ services:
 
   minio:
     image: bitnami/minio:latest
-    container_name: minio
+    container_name: dropit-storage
     ports:
       - "9000:9000"
       - "9001:9001"
