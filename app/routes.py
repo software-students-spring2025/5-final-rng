@@ -12,6 +12,7 @@ from flask import (
 )
 from nanoid import generate
 from pymongo import MongoClient
+from minio import Minio
 
 main = Blueprint("main", __name__)
 UPLOAD_FOLDER = "dropit_uploads"
@@ -24,6 +25,15 @@ if not os.path.exists(UPLOAD_FOLDER):
 client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
 db = client["dropit"]
 files_collection = db["files"]
+
+minio = Minio(
+    os.getenv("MINIO_URL", "http://localhost:9000"),
+    access_key=os.getenv("MINIO_ACCESS_KEY", "minio_access_key"),
+    secret_key=os.getenv("MINIO_SECRET_KEY", "minio_secret_key"),
+    secure=False,
+)
+
+minio.make_bucket(os.getenv("MINIO_BUCKET_NAME", "dropit-storage"))
 
 # File type icons mapping
 file_type_icons = {
@@ -99,10 +109,12 @@ def upload_file():
         download_limit = int(download_limit) if download_limit else 0
     except ValueError:
         download_limit = 0
-    
+
     try:
         expiration_days = int(expiration_days)
-        expiration_date = (datetime.utcnow() + timedelta(days=expiration_days)).strftime("%Y-%m-%d")
+        expiration_date = (
+            datetime.utcnow() + timedelta(days=expiration_days)
+        ).strftime("%Y-%m-%d")
     except ValueError:
         expiration_date = (datetime.utcnow() + timedelta(days=7)).strftime("%Y-%m-%d")
 
@@ -190,5 +202,7 @@ def file_success(file_id):
         file_size=format_file_size(file_doc["file_size"]),
         expiration_date=file_doc.get("expiration_date", "Never"),
         download_limit=file_doc.get("download_limit", 0) or "Unlimited",
-        download_url=url_for("main.access_file", file_id=file_doc["_id"], _external=True),
+        download_url=url_for(
+            "main.access_file", file_id=file_doc["_id"], _external=True
+        ),
     )
