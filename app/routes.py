@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from flask import (
     Blueprint,
     flash,
+    json,
     jsonify,
     redirect,
     render_template,
@@ -206,21 +207,29 @@ def upload_file():
         return redirect(request.url)
 
 
-@main.route("/files/<file_id>", methods=["GET", "POST"])
+@main.route("/files/<file_id>")
 def access_file(file_id):
     """Password verification screen and file download handler"""
     file_doc = files_collection.find_one({"_id": file_id})
     if not file_doc:
-        return jsonify({"error": "File not found"}), 404
+        return jsonify({"error": "File not found or it is expired"}), 404
 
     return render_template(
         "verify.html",
         file_id=file_doc["_id"],
-        filename=file_doc["original_filename"],
-        has_password=bool(file_doc.get("password")),
-        download_limit=file_doc.get("download_limit", 0),
-        download_count=file_doc.get("download_count", 0),
     )
+
+
+@main.route("/files/<file_id>/verify", methods=["POST"])
+def verify(file_id):
+    """Password verification"""
+    file_doc = files_collection.find_one({"_id": file_id})
+    if not file_doc:
+        return jsonify({"error": "File not found or it is expired"}), 404
+
+    verified = True
+
+    return jsonify({"verified": verified})
 
 
 @main.route("/files/<file_id>/success")
