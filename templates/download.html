@@ -1,79 +1,83 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Download File</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f3f4f6;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <title>Download File</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f3f4f6;
+      }
 
-    .navbar {
-      background-color: #007BFF;
-      color: white;
-      padding: 16px;
-      text-align: center;
-      font-size: 24px;
-      font-weight: bold;
-      letter-spacing: 1px;
-    }
+      .navbar {
+        background-color: #007bff;
+        color: white;
+        padding: 16px;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        letter-spacing: 1px;
+      }
 
-    .container {
-      background: white;
-      padding: 40px;
-      border-radius: 16px;
-      max-width: 600px;
-      margin: 60px auto;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-      text-align: center;
-    }
+      .container {
+        background: white;
+        padding: 40px;
+        border-radius: 16px;
+        max-width: 600px;
+        margin: 60px auto;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        text-align: center;
+      }
 
-    .file-icon {
-      font-size: 48px;
-      margin-bottom: 20px;
-    }
+      .file-icon {
+        font-size: 48px;
+        margin-bottom: 20px;
+      }
 
-    .info-text {
-      font-size: 18px;
-      color: #333;
-      margin: 8px 0;
-    }
+      .info-text {
+        font-size: 18px;
+        color: #333;
+        margin: 8px 0;
+      }
 
-    .btn {
-      display: inline-block;
-      background-color: #007BFF;
-      color: white;
-      padding: 14px 28px;
-      margin-top: 30px;
-      font-size: 16px;
-      text-decoration: none;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2);
-      transition: background-color 0.3s ease, box-shadow 0.3s ease;
-    }
+      .btn {
+        display: inline-block;
+        background-color: #007bff;
+        color: white;
+        padding: 14px 28px;
+        margin-top: 30px;
+        font-size: 16px;
+        text-decoration: none;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2);
+        transition:
+          background-color 0.3s ease,
+          box-shadow 0.3s ease;
+      }
 
-    .btn:hover {
-      background-color: #0056b3;
-      box-shadow: 0 6px 20px rgba(0, 123, 255, 0.3);
-    }
-  </style>
-</head>
-<body>
+      .btn:hover {
+        background-color: #0056b3;
+        box-shadow: 0 6px 20px rgba(0, 123, 255, 0.3);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="navbar">🔒 DropIt</div>
 
-  <div class="navbar">
-    🔒 DropIt
-  </div>
+    <div class="container">
+      <div class="file-icon">📄</div>
+      <h2>Ready to download your file</h2>
+      <p class="info-text"><strong>Filename:</strong> {{ file.filename }}</p>
+      <p class="info-text">
+        <strong>Uploaded at:</strong> {{ file.upload_time }}
+      </p>
 
-  <div class="container">
-    <div class="file-icon">📄</div>
-    <h2>Ready to download your file</h2>
-    <p class="info-text"><strong>Filename:</strong> {{ file.filename }}</p>
-    <p class="info-text"><strong>Uploaded at:</strong> {{ file.upload_time }}</p>
-
-    <a class="btn" href="{{ url_for('main.direct_download', file_id=file.file_id) }}">⬇️ Download Now</a>
-  </div>
-
-</body>
+      <a
+        class="btn"
+        href="/files/{{ file._id }}/download?password={{ password }}"
+        >⬇️ Download Now</a
+      >
+    </div>
+  </body>
 </html>
