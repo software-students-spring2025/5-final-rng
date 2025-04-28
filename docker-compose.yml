@@ -41,6 +41,8 @@ services:
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-admin}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-pass1234}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minio_access_key}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minio_secret_key}
     restart: unless-stopped
     networks:
       - default

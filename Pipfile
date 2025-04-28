@@ -10,6 +10,7 @@ pymongo = "*"
 ruff = "*"
 pytest = "*"
 nanoid = "*"
+minio = "*"
 
 [dev-packages]
 

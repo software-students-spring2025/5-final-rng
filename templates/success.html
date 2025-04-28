@@ -58,6 +58,19 @@
     .download-link:hover {
       background-color: #2980b9;
     }
+    .upload-link {
+      display: inline-block;
+      background-color: #3498db;
+      color: white;
+      text-decoration: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      transition: background-color 0.3s;
+    }
+    .upload-link:hover {
+      background-color: #2980b9;
+    }
     .footer-note {
       font-size: 13px;
       color: #888;
@@ -79,7 +92,7 @@
       <p><strong>Download Limit:</strong> {{ download_limit or 'Unlimited' }}</p>
     </div>
 
-    <a href="{{ download_url }}" class="download-link" download>Download File</a>
+    <a href="{{ url_for('main.index') }}" class="upload-link">Back To Upload</a>
 
     <!-- ✅ Copy Link Button -->
 <button onclick="copyToClipboard()" class="download-link" style="background-color: #f39c12; margin-left: 10px;">
