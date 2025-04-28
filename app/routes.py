@@ -108,10 +108,10 @@ def upload_file():
 
     # Hash the password if one is provided
     hashed_password = hash_password(password) if password else ""
-    
+
     # If the hashed password is bytes, convert to string for MongoDB storage
     if isinstance(hashed_password, bytes):
-        hashed_password = hashed_password.decode('utf-8')
+        hashed_password = hashed_password.decode("utf-8")
 
     # Convert download_limit to integer
     try:
@@ -222,7 +222,7 @@ def access_file(file_id):
     file_doc = files_collection.find_one({"_id": file_id})
     if not file_doc:
         return jsonify({"error": "File not found"}), 404
-    
+
     # Check if file is expired
     if file_doc.get("expiration_date"):
         try:
@@ -233,9 +233,12 @@ def access_file(file_id):
         except ValueError:
             # If date format is invalid, ignore expiration check
             pass
-    
+
     # Check if download limit is reached
-    if file_doc.get("download_limit") and file_doc["download_count"] >= file_doc["download_limit"]:
+    if (
+        file_doc.get("download_limit")
+        and file_doc["download_count"] >= file_doc["download_limit"]
+    ):
         flash("Download limit reached for this file", "error")
         return redirect(url_for("main.index"))
 
@@ -243,63 +246,58 @@ def access_file(file_id):
     if request.method == "POST":
         entered_password = request.form.get("password", "")
         stored_password = file_doc.get("password", "")
-        
+
         # Verify the password using bcrypt
         if not verify_password(stored_password, entered_password):
             flash("Incorrect password", "error")
             return render_template(
-                "verify.html", 
+                "verify.html",
                 file_id=file_doc["_id"],
                 filename=file_doc["original_filename"],
                 has_password=file_doc.get("has_password", bool(stored_password)),
                 download_limit=file_doc.get("download_limit", 0),
                 download_count=file_doc.get("download_count", 0),
             )
-        
+
         # Password is correct, proceed with download
         try:
             # Increment download counter
             files_collection.update_one(
-                {"_id": file_id},
-                {"$inc": {"download_count": 1}}
+                {"_id": file_id}, {"$inc": {"download_count": 1}}
             )
-            
+
             # Get the file from MinIO
             file_path = os.path.join(UPLOAD_FOLDER, file_doc["saved_filename"])
-            
+
             # Check if the directory exists, create it if it doesn't
             if not os.path.exists(UPLOAD_FOLDER):
                 os.makedirs(UPLOAD_FOLDER)
-            
+
             # Download the file from MinIO to a temporary location
-            minio.fget_object(
-                bucket_name,
-                file_doc["saved_filename"],
-                file_path
-            )
-            
+            minio.fget_object(bucket_name, file_doc["saved_filename"], file_path)
+
             # Serve the file to the user
             response = send_file(
                 file_path,
                 mimetype=file_doc.get("content_type", "application/octet-stream"),
                 as_attachment=True,
-                download_name=file_doc["original_filename"]
+                download_name=file_doc["original_filename"],
             )
-            
+
             # Delete the temporary file after sending
             @response.call_on_close
             def cleanup():
                 if os.path.exists(file_path):
                     os.remove(file_path)
                     print(f"Temporary file {file_path} deleted")
-            
+
             return response
-            
+
         except Exception as e:
             print(f"Error during file download: {str(e)}")
             flash("Error downloading file. Please try again.", "error")
             return redirect(url_for("main.index"))
-    
+
     # GET request - show password verification form if needed
     return render_template(
         "verify.html",
@@ -309,6 +307,7 @@ def access_file(file_id):
         download_limit=file_doc.get("download_limit", 0),
         download_count=file_doc.get("download_count", 0),
     )
+
 
 @main.route("/files/<file_id>/success")
 def file_success(file_id):
@@ -339,55 +338,59 @@ def file_success(file_id):
         ),
     )
 
+
 import bcrypt  # Add this import
+
 
 # Add these functions after your imports but before your routes
 def hash_password(password):
     """
     Hash a password using bcrypt
-    
+
     Args:
         password (str): The plain text password
-        
+
     Returns:
         bytes: The hashed password
     """
     if not password:
         return None
-    
+
     # Generate a salt and hash the password
     salt = bcrypt.gensalt()
-    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
-    
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+
     return hashed
+
 
 def verify_password(stored_hash, provided_password):
     """
     Verify a password against a stored hash
-    
+
     Args:
         stored_hash (bytes or str): The hashed password from the database
         provided_password (str): The plain text password to check
-        
+
     Returns:
         bool: True if the password matches, False otherwise
     """
     # If no password was set, and none provided, return True
     if not stored_hash:
         return not provided_password
-    
+
     # If stored_hash is a string (from MongoDB), convert it to bytes
     if isinstance(stored_hash, str):
-        stored_hash = stored_hash.encode('utf-8')
-    
+        stored_hash = stored_hash.encode("utf-8")
+
     # Check if the provided password matches the stored hash
-    return bcrypt.checkpw(provided_password.encode('utf-8'), stored_hash)
+    return bcrypt.checkpw(provided_password.encode("utf-8"), stored_hash)
+
 
 # Test function for the hashing implementation
 def test_password_hashing():
     """
     Test the password hashing and verification functions
-    
+
     Returns:
         bool: True if all tests pass, False otherwise
     """
@@ -396,21 +399,21 @@ def test_password_hashing():
     hashed = hash_password(password)
     assert verify_password(hashed, password) == True
     assert verify_password(hashed, "wrongpassword") == False
-    
+
     # Test case 2: Empty password
     empty_password = ""
     empty_hash = hash_password(empty_password)
     assert verify_password(empty_hash, empty_password) == True
     assert verify_password(empty_hash, "somepassword") == False
-    
+
     # Test case 3: None password
     none_hash = hash_password(None)
     assert none_hash is None
-    
+
     # Test case 4: Special characters
     special_password = "p@$$w0rd!#$%^&*()"
     special_hash = hash_password(special_password)
     assert verify_password(special_hash, special_password) == True
-    
+
     print("All password hashing tests passed!")
     return True
