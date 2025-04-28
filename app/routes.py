@@ -218,7 +218,7 @@ def upload_file():
         return redirect(request.url)
 
 
-@main.route("/files/<file_id>")
+@main.route("/files/<file_id>", methods=["GET", "POST"])
 def access_file(file_id):
     """Password verification screen and file download handler"""
     file_doc = files_collection.find_one({"_id": file_id})
@@ -228,11 +228,23 @@ def access_file(file_id):
     # if password is empty
     if not file_doc["has_password"]:
         return render_template("download.html", file=file_doc)
+    
+    # Handle POST request (from verify.html form)
+    if request.method == "POST":
+        entered_password = request.form.get("password", None)
+        if entered_password and verify_password(file_doc["password"], entered_password):
+            return render_template(
+                "download.html", file=file_doc, password=entered_password
+            )
+        else:
+            flash("Incorrect password", "error")
+            return render_template("verify.html", file_id=file_doc["_id"])
 
+    # Handle GET request
     entered_password = request.args.get("password", None)
 
     if entered_password:
-        if verify_password(file_doc.password, entered_password):
+        if verify_password(file_doc["password"], entered_password):
             return render_template(
                 "download.html", file=file_doc, password=entered_password
             )
