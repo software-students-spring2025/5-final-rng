@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import (
     Blueprint,
@@ -89,8 +89,8 @@ def upload_file():
     file_id = generate()
 
     # Get metadata from the form
-    password = request.form.get("password", "")
-    expiration_date = request.form.get("expiration-date", "")
+    password = request.form.get("password", "")  # Now optional
+    expiration_days = request.form.get("expiration-date", "7")  # Default to 7 days
     download_limit = request.form.get("download-limit", "0")
     description = request.form.get("description", "")
 
@@ -99,6 +99,12 @@ def upload_file():
         download_limit = int(download_limit) if download_limit else 0
     except ValueError:
         download_limit = 0
+    
+    try:
+        expiration_days = int(expiration_days)
+        expiration_date = (datetime.utcnow() + timedelta(days=expiration_days)).strftime("%Y-%m-%d")
+    except ValueError:
+        expiration_date = (datetime.utcnow() + timedelta(days=7)).strftime("%Y-%m-%d")
 
     # Save the file with a unique name
     original_filename = file.filename
