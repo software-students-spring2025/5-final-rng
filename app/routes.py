@@ -33,7 +33,7 @@ minio = Minio(
     secure=False,
 )
 
-minio.make_bucket(os.getenv("MINIO_BUCKET_NAME", "dropit-storage"))
+bucket_name = os.getenv("MINIO_BUCKET_NAME", "dropit-storage")
 
 # File type icons mapping
 file_type_icons = {
@@ -124,41 +124,86 @@ def upload_file():
     local_path = os.path.join(UPLOAD_FOLDER, saved_name)
     file.save(local_path)
 
-    # Get file information
-    file_size = os.path.getsize(local_path)
-    content_type = file.content_type
-    file_icon = get_file_icon(original_filename, content_type)
+    try:
+        # upload to the bucket
+        # Make the bucket if it doesn't exist.
+        found = minio.bucket_exists(bucket_name)
+        if not found:
+            minio.make_bucket(bucket_name)
+            print("Created bucket", bucket_name)
+        else:
+            print("Bucket", bucket_name, "already exists")
 
-    # Save metadata to MongoDB
-    file_data = {
-        "_id": file_id,
-        "original_filename": original_filename,
-        "saved_filename": saved_name,
-        "file_path": local_path,
-        "file_size": file_size,
-        "content_type": content_type,
-        "file_icon": file_icon,
-        "upload_time": datetime.utcnow(),
-        "password": password,
-        "expiration_date": expiration_date,
-        "download_limit": download_limit,
-        "download_count": 0,
-        "description": description,
-    }
-
-    files_collection.insert_one(file_data)
-
-    # Handle AJAX requests
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return jsonify(
-            {
-                "success": True,
-                "file_id": file_id,
-                "redirect_url": url_for("main.file_success", file_id=file_id),
-            }
+        # Upload the file, renaming it in the process
+        minio.fput_object(
+            bucket_name,
+            saved_name,
+            local_path,
+        )
+        print(
+            local_path,
+            "successfully uploaded as object",
+            saved_name,
+            "to bucket",
+            bucket_name,
         )
 
-    return redirect(url_for("main.file_success", file_id=file_id))
+        # Get file information
+        file_size = os.path.getsize(local_path)
+        content_type = file.content_type
+        file_icon = get_file_icon(original_filename, content_type)
+
+        # Save metadata to MongoDB
+        file_data = {
+            "_id": file_id,
+            "original_filename": original_filename,
+            "saved_filename": saved_name,
+            # "file_path": local_path,  # No longer needed since we're deleting the local file
+            "file_size": file_size,
+            "content_type": content_type,
+            "file_icon": file_icon,
+            "upload_time": datetime.utcnow(),
+            "password": password,
+            "expiration_date": expiration_date,
+            "download_limit": download_limit,
+            "download_count": 0,
+            "description": description,
+        }
+
+        files_collection.insert_one(file_data)
+
+        # Delete the local file after successful upload to MinIO and metadata saved to MongoDB
+        if os.path.exists(local_path):
+            os.remove(local_path)
+            print(f"Local file {local_path} deleted successfully")
+
+        # Handle AJAX requests
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify(
+                {
+                    "success": True,
+                    "file_id": file_id,
+                    "redirect_url": url_for("main.file_success", file_id=file_id),
+                }
+            )
+
+        return redirect(url_for("main.file_success", file_id=file_id))
+
+    except Exception as e:
+        # If an error occurs during the process, make sure to clean up the local file
+        if os.path.exists(local_path):
+            os.remove(local_path)
+            print(f"Local file {local_path} deleted after error")
+
+        # Log the error
+        print(f"Error during file upload: {str(e)}")
+
+        # Return an error response
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"error": "Upload failed. Please try again."}), 500
+
+        flash("Upload failed. Please try again.", "error")
+        return redirect(request.url)
 
 
 @main.route("/files/<file_id>", methods=["GET", "POST"])
