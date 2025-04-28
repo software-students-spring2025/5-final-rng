@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from flask import (
     Blueprint,
     flash,
+    send_file,
     jsonify,
     redirect,
     render_template,
@@ -16,7 +17,9 @@ from minio import Minio
 import bcrypt
 
 main = Blueprint("main", __name__)
-UPLOAD_FOLDER = "dropit_uploads"
+UPLOAD_FOLDER = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "dropit_uploads"
+)
 
 # Ensure upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
@@ -215,13 +218,24 @@ def upload_file():
         return redirect(request.url)
 
 
-# Modify your access_file route to verify the password
-@main.route("/files/<file_id>", methods=["GET", "POST"])
+@main.route("/files/<file_id>")
 def access_file(file_id):
     """Password verification screen and file download handler"""
     file_doc = files_collection.find_one({"_id": file_id})
     if not file_doc:
-        return jsonify({"error": "File not found"}), 404
+        return jsonify({"error": "File not found or it is expired"}), 404
+
+    # if password is empty
+    if not file_doc["has_password"]:
+        return render_template("download.html", file=file_doc)
+
+    entered_password = request.args.get("password", None)
+
+    if entered_password:
+        if verify_password(file_doc.password, entered_password):
+            return render_template(
+                "download.html", file=file_doc, password=entered_password
+            )
 
     # Check if file is expired
     if file_doc.get("expiration_date"):
@@ -242,71 +256,77 @@ def access_file(file_id):
         flash("Download limit reached for this file", "error")
         return redirect(url_for("main.index"))
 
-    # Handle form submission (password verification)
-    if request.method == "POST":
-        entered_password = request.form.get("password", "")
-        stored_password = file_doc.get("password", "")
-
-        # Verify the password using bcrypt
-        if not verify_password(stored_password, entered_password):
-            flash("Incorrect password", "error")
-            return render_template(
-                "verify.html",
-                file_id=file_doc["_id"],
-                filename=file_doc["original_filename"],
-                has_password=file_doc.get("has_password", bool(stored_password)),
-                download_limit=file_doc.get("download_limit", 0),
-                download_count=file_doc.get("download_count", 0),
-            )
-
-        # Password is correct, proceed with download
-        try:
-            # Increment download counter
-            files_collection.update_one(
-                {"_id": file_id}, {"$inc": {"download_count": 1}}
-            )
-
-            # Get the file from MinIO
-            file_path = os.path.join(UPLOAD_FOLDER, file_doc["saved_filename"])
-
-            # Check if the directory exists, create it if it doesn't
-            if not os.path.exists(UPLOAD_FOLDER):
-                os.makedirs(UPLOAD_FOLDER)
-
-            # Download the file from MinIO to a temporary location
-            minio.fget_object(bucket_name, file_doc["saved_filename"], file_path)
-
-            # Serve the file to the user
-            response = send_file(
-                file_path,
-                mimetype=file_doc.get("content_type", "application/octet-stream"),
-                as_attachment=True,
-                download_name=file_doc["original_filename"],
-            )
-
-            # Delete the temporary file after sending
-            @response.call_on_close
-            def cleanup():
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    print(f"Temporary file {file_path} deleted")
-
-            return response
-
-        except Exception as e:
-            print(f"Error during file download: {str(e)}")
-            flash("Error downloading file. Please try again.", "error")
-            return redirect(url_for("main.index"))
-
     # GET request - show password verification form if needed
     return render_template(
         "verify.html",
         file_id=file_doc["_id"],
-        filename=file_doc["original_filename"],
-        has_password=file_doc.get("has_password", bool(file_doc.get("password"))),
-        download_limit=file_doc.get("download_limit", 0),
-        download_count=file_doc.get("download_count", 0),
     )
+
+
+@main.route("/files/<file_id>/download")
+def download_file(file_id):
+    file_doc = files_collection.find_one({"_id": file_id})
+    if not file_doc:
+        return jsonify({"error": "File not found or it is expired"}), 404
+
+    entered_password = request.args.get("password")
+
+    # Check if password is required and verify it
+    if file_doc["has_password"]:
+        if not entered_password or not verify_password(
+            file_doc["password"], entered_password
+        ):
+            return redirect(url_for("main.access_file", file_id=file_id))
+
+    # Check if file is expired
+    if file_doc.get("expiration_date"):
+        try:
+            expiration_date = datetime.strptime(file_doc["expiration_date"], "%Y-%m-%d")
+            if datetime.utcnow() > expiration_date:
+                flash("This file has expired", "error")
+                return redirect(url_for("main.index"))
+        except ValueError:
+            # If date format is invalid, ignore expiration check
+            pass
+
+    # Check if download limit is reached
+    if (
+        file_doc.get("download_limit")
+        and file_doc["download_count"] >= file_doc["download_limit"]
+    ):
+        flash("Download limit reached for this file", "error")
+        return redirect(url_for("main.index"))
+
+    # Create a temporary file to store the downloaded content
+    temp_file_path = os.path.join(
+        UPLOAD_FOLDER, os.path.basename(file_doc["saved_filename"])
+    )
+
+    try:
+        # Ensure the upload directory exists
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+        # Get the file from MinIO
+        minio.fget_object(bucket_name, file_doc["saved_filename"], temp_file_path)
+
+        # Update download count
+        files_collection.update_one({"_id": file_id}, {"$inc": {"download_count": 1}})
+
+        # Serve the file to the user
+        return send_file(
+            temp_file_path,
+            mimetype=file_doc.get("content_type", "application/octet-stream"),
+            as_attachment=True,
+            download_name=file_doc["original_filename"],
+        )
+    except Exception as e:
+        print(f"Error downloading file: {str(e)}")
+        flash("Error downloading file. Please try again.", "error")
+        return redirect(url_for("main.index"))
+    finally:
+        # Clean up the temporary file
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
 
 @main.route("/files/<file_id>/success")
@@ -337,9 +357,6 @@ def file_success(file_id):
             "main.access_file", file_id=file_doc["_id"], _external=True
         ),
     )
-
-
-import bcrypt  # Add this import
 
 
 # Add these functions after your imports but before your routes
@@ -384,36 +401,3 @@ def verify_password(stored_hash, provided_password):
 
     # Check if the provided password matches the stored hash
     return bcrypt.checkpw(provided_password.encode("utf-8"), stored_hash)
-
-
-# Test function for the hashing implementation
-def test_password_hashing():
-    """
-    Test the password hashing and verification functions
-
-    Returns:
-        bool: True if all tests pass, False otherwise
-    """
-    # Test case 1: Regular password
-    password = "mysecretpassword"
-    hashed = hash_password(password)
-    assert verify_password(hashed, password) == True
-    assert verify_password(hashed, "wrongpassword") == False
-
-    # Test case 2: Empty password
-    empty_password = ""
-    empty_hash = hash_password(empty_password)
-    assert verify_password(empty_hash, empty_password) == True
-    assert verify_password(empty_hash, "somepassword") == False
-
-    # Test case 3: None password
-    none_hash = hash_password(None)
-    assert none_hash is None
-
-    # Test case 4: Special characters
-    special_password = "p@$$w0rd!#$%^&*()"
-    special_hash = hash_password(special_password)
-    assert verify_password(special_hash, special_password) == True
-
-    print("All password hashing tests passed!")
-    return True
