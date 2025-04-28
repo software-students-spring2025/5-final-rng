@@ -108,6 +108,47 @@
     #file-input {
       display: none;
     }
+    .file-info {
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #e0e0e0;
+      border-radius: 5px;
+      background: #f9f9f9;
+      display: none;
+    }
+    .file-type-icon {
+      font-size: 36px;
+      margin-right: 10px;
+    }
+    .thumbnail-preview {
+      max-width: 100%;
+      max-height: 150px;
+      margin-top: 10px;
+      border-radius: 4px;
+      display: none;
+    }
+    .progress-container {
+      margin-top: 20px;
+      display: none;
+    }
+    .progress-bar {
+      height: 12px;
+      background-color: #ecf0f1;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background-color: #2ecc71;
+      width: 0%;
+      transition: width 0.3s;
+    }
+    .progress-text {
+      text-align: right;
+      font-size: 12px;
+      color: #7f8c8d;
+      margin-top: 5px;
+    }
     @media (max-width: 768px) {
       .form-column {
         flex: 100%;
@@ -129,6 +170,28 @@
         <p class="drag-text">or</p>
         <button type="button" class="browse-btn" id="browse-btn">Browse Files</button>
         <input type="file" id="file-input" name="file" required>
+      </div>
+      
+      <!-- File Info Display -->
+      <div id="file-info" class="file-info">
+        <div style="display: flex; align-items: center;">
+          <span id="file-type-icon" class="file-type-icon"><i class="fas fa-file"></i></span>
+          <div>
+            <p><strong>File Name:</strong> <span id="file-name"></span></p>
+            <p><strong>File Size:</strong> <span id="file-size"></span></p>
+            <p><strong>File Type:</strong> <span id="file-type"></span></p>
+          </div>
+        </div>
+        <img id="thumbnail-preview" class="thumbnail-preview">
+        <button type="button" class="remove-file" id="remove-file">Remove File</button>
+      </div>
+      
+      <!-- Progress Display -->
+      <div id="progress-container" class="progress-container">
+        <div class="progress-bar">
+          <div id="progress-fill" class="progress-fill"></div>
+        </div>
+        <p class="progress-text"><span id="progress-percentage">0%</span> uploaded</p>
       </div>
       
       <!-- Metadata Form -->
@@ -175,93 +238,13 @@
       </div>
       
       <!-- Submit Button -->
-      <button type="submit" class="submit-btn" id="upload-btn" disabled>Upload File</button>
+      <button type="submit" class="submit-btn" id="submit-btn" disabled>Upload File</button>
     </form>
   </div>
 
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const dropArea = document.getElementById('drop-area');
-      const fileInput = document.getElementById('file-input');
-      const browseBtn = document.getElementById('browse-btn');
-      const uploadBtn = document.getElementById('upload-btn');
-      
-      // Open file dialog when browse button is clicked
-      browseBtn.addEventListener('click', function() {
-        fileInput.click();
-      });
-      
-      // Handle file selection
-      fileInput.addEventListener('change', function() {
-        if (fileInput.files.length > 0) {
-          uploadBtn.disabled = false;
-          dropArea.style.borderColor = '#4a90e2';
-          dropArea.style.backgroundColor = '#e8f4ff';
-          dropArea.innerHTML = `<i class="fas fa-file-alt upload-icon"></i>
-                               <p class="drag-text">${fileInput.files[0].name}</p>
-                               <p class="drag-text">${formatFileSize(fileInput.files[0].size)}</p>`;
-        }
-      });
-      
-      // Handle drag events
-      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, preventDefaults, false);
-      });
-      
-      function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-      
-      ['dragenter', 'dragover'].forEach(eventName => {
-        dropArea.addEventListener(eventName, highlight, false);
-      });
-      
-      ['dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, unhighlight, false);
-      });
-      
-      function highlight() {
-        dropArea.style.borderColor = '#4a90e2';
-        dropArea.style.backgroundColor = '#e8f4ff';
-      }
-      
-      function unhighlight() {
-        dropArea.style.borderColor = '#ccc';
-        dropArea.style.backgroundColor = '#f9f9ff';
-      }
-      
-      // Handle dropped files
-      dropArea.addEventListener('drop', function(e) {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        
-        if (files.length > 0) {
-          fileInput.files = files;
-          uploadBtn.disabled = false;
-          dropArea.innerHTML = `<i class="fas fa-file-alt upload-icon"></i>
-                                <p class="drag-text">${files[0].name}</p>
-                                <p class="drag-text">${formatFileSize(files[0].size)}</p>`;
-        }
-      });
-      
-      // Format file size
-      function formatFileSize(bytes) {
-        if (bytes < 1024) {
-          return bytes + ' bytes';
-        } else if (bytes < 1048576) {
-          return (bytes / 1024).toFixed(1) + ' KB';
-        } else {
-          return (bytes / 1048576).toFixed(1) + ' MB';
-        }
-      }
-    });
-  </script>
-</body>
-</html>
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const dropZone = document.getElementById('drop-zone');
       const fileInput = document.getElementById('file-input');
       const browseBtn = document.getElementById('browse-btn');
       const fileInfo = document.getElementById('file-info');
@@ -278,92 +261,109 @@
       const uploadForm = document.getElementById('upload-form');
       
       // Open file dialog when browse button is clicked
-      browseBtn.addEventListener('click', function() {
-        fileInput.click();
-      });
+      if (browseBtn && fileInput) {
+        browseBtn.addEventListener('click', function() {
+          fileInput.click();
+        });
+      }
       
       // Handle file selection
-      fileInput.addEventListener('change', function() {
-        if (fileInput.files.length > 0) {
-          displayFileInfo(fileInput.files[0]);
-        }
-      });
+      if (fileInput) {
+        fileInput.addEventListener('change', function() {
+          if (fileInput.files.length > 0) {
+            displayFileInfo(fileInput.files[0]);
+          }
+        });
+      }
       
       // Handle drag events
-      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, preventDefaults, false);
-      });
-      
-      function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-      
-      ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, highlight, false);
-      });
-      
-      ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, unhighlight, false);
-      });
-      
-      function highlight() {
-        dropZone.classList.add('active');
-      }
-      
-      function unhighlight() {
-        dropZone.classList.remove('active');
-      }
-      
-      // Handle dropped files
-      dropZone.addEventListener('drop', function(e) {
-        const dt = e.dataTransfer;
-        const files = dt.files;
+      if (dropArea) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+          dropArea.addEventListener(eventName, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }, false);
+        });
         
-        if (files.length > 0) {
-          fileInput.files = files;
-          displayFileInfo(files[0]);
-        }
-      });
+        ['dragenter', 'dragover'].forEach(eventName => {
+          dropArea.addEventListener(eventName, function() {
+            dropArea.style.borderColor = '#4a90e2';
+            dropArea.style.backgroundColor = '#e8f4ff';
+          }, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+          dropArea.addEventListener(eventName, function() {
+            dropArea.style.borderColor = '#ccc';
+            dropArea.style.backgroundColor = '#f9f9ff';
+          }, false);
+        });
+        
+        // Handle dropped files
+        dropArea.addEventListener('drop', function(e) {
+          const dt = e.dataTransfer;
+          const files = dt.files;
+          
+          if (files.length > 0 && fileInput) {
+            fileInput.files = files;
+            displayFileInfo(files[0]);
+          }
+        });
+      }
       
       // Display file information
       function displayFileInfo(file) {
-        fileName.textContent = file.name;
-        fileSize.textContent = formatFileSize(file.size);
-        fileType.textContent = file.type || 'Unknown';
-        
-        // Set appropriate icon based on file type
-        let iconClass = 'fa-file';
-        
-        if (file.type.includes('image')) {
-          iconClass = 'fa-file-image';
-          // Preview image if it's an image file
-          const reader = new FileReader();
-          reader.onload = function(e) {
-            thumbnailPreview.src = e.target.result;
-            thumbnailPreview.style.display = 'block';
-          };
-          reader.readAsDataURL(file);
-        } else if (file.type.includes('pdf')) {
-          iconClass = 'fa-file-pdf';
-        } else if (file.type.includes('word') || file.name.endsWith('.doc') || file.name.endsWith('.docx')) {
-          iconClass = 'fa-file-word';
-        } else if (file.type.includes('excel') || file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
-          iconClass = 'fa-file-excel';
-        } else if (file.type.includes('video')) {
-          iconClass = 'fa-file-video';
-        } else if (file.type.includes('audio')) {
-          iconClass = 'fa-file-audio';
-        } else if (file.type.includes('zip') || file.type.includes('compressed')) {
-          iconClass = 'fa-file-archive';
-        } else if (file.type.includes('text')) {
-          iconClass = 'fa-file-alt';
+        if (fileName && fileSize && fileType) {
+          fileName.textContent = file.name;
+          fileSize.textContent = formatFileSize(file.size);
+          fileType.textContent = file.type || 'Unknown';
+          
+          // Set appropriate icon based on file type
+          let iconClass = 'fa-file';
+          
+          if (file.type.includes('image')) {
+            iconClass = 'fa-file-image';
+            // Preview image if it's an image file
+            if (thumbnailPreview) {
+              const reader = new FileReader();
+              reader.onload = function(e) {
+                thumbnailPreview.src = e.target.result;
+                thumbnailPreview.style.display = 'block';
+              };
+              reader.readAsDataURL(file);
+            }
+          } else if (file.type.includes('pdf')) {
+            iconClass = 'fa-file-pdf';
+          } else if (file.type.includes('word') || file.name.endsWith('.doc') || file.name.endsWith('.docx')) {
+            iconClass = 'fa-file-word';
+          } else if (file.type.includes('excel') || file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
+            iconClass = 'fa-file-excel';
+          } else if (file.type.includes('video')) {
+            iconClass = 'fa-file-video';
+          } else if (file.type.includes('audio')) {
+            iconClass = 'fa-file-audio';
+          } else if (file.type.includes('zip') || file.type.includes('compressed')) {
+            iconClass = 'fa-file-archive';
+          } else if (file.type.includes('text')) {
+            iconClass = 'fa-file-alt';
+          }
+          
+          if (fileTypeIcon) {
+            fileTypeIcon.innerHTML = `<i class="fas ${iconClass}"></i>`;
+          }
+          
+          if (fileInfo) {
+            fileInfo.style.display = 'block';
+          }
+          
+          if (thumbnailPreview) {
+            thumbnailPreview.style.display = file.type.includes('image') ? 'block' : 'none';
+          }
+          
+          if (submitBtn) {
+            submitBtn.disabled = false;
+          }
         }
-        
-        fileTypeIcon.innerHTML = `<i class="fas ${iconClass}"></i>`;
-        fileInfo.style.display = 'block';
-        thumbnailPreview.style.display = file.type.includes('image') ? 'block' : 'none';
-        submitBtn.disabled = false;
       }
       
       // Format file size
@@ -378,103 +378,124 @@
       }
       
       // Remove selected file
-      removeFile.addEventListener('click', function() {
-        fileInput.value = '';
-        fileInfo.style.display = 'none';
-        thumbnailPreview.style.display = 'none';
-        thumbnailPreview.src = '';
-        submitBtn.disabled = true;
-      });
+      if (removeFile) {
+        removeFile.addEventListener('click', function() {
+          if (fileInput) {
+            fileInput.value = '';
+          }
+          if (fileInfo) {
+            fileInfo.style.display = 'none';
+          }
+          if (thumbnailPreview) {
+            thumbnailPreview.style.display = 'none';
+            thumbnailPreview.src = '';
+          }
+          if (submitBtn) {
+            submitBtn.disabled = true;
+          }
+        });
+      }
       
       // Handle form submission
-      uploadForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        if (!fileInput.files.length) {
-          alert('Please select a file to upload');
-          return;
-        }
-        
-        try {
-          // Create a new FormData object manually instead of from the form
-          const formData = new FormData();
+      if (uploadForm) {
+        uploadForm.addEventListener('submit', function(e) {
+          e.preventDefault();
           
-          // Add the file
-          formData.append('file', fileInput.files[0]);
+          if (!fileInput || !fileInput.files.length) {
+            alert('Please select a file to upload');
+            return;
+          }
           
-          // Add other form fields manually to avoid browser extension interference
-          formData.append('password', document.getElementById('password').value);
-          formData.append('expiration-date', document.getElementById('expiration-date').value);
-          formData.append('download-limit', document.getElementById('download-limit').value);
-          formData.append('description', document.getElementById('description').value);
-          
-          // Show progress bar
-          progressContainer.style.display = 'block';
-          submitBtn.disabled = true;
-          
-          // Use XMLHttpRequest for upload with progress
-          const xhr = new XMLHttpRequest();
-          
-          xhr.upload.addEventListener('progress', function(e) {
-            if (e.lengthComputable) {
-              const percentComplete = Math.round((e.loaded / e.total) * 100);
-              progressFill.style.width = percentComplete + '%';
-              progressPercentage.textContent = percentComplete + '%';
+          try {
+            // Create a new FormData object manually instead of from the form
+            const formData = new FormData();
+            
+            // Add the file
+            formData.append('file', fileInput.files[0]);
+            
+            // Add other form fields manually to avoid browser extension interference
+            const passwordField = document.getElementById('password');
+            const expirationField = document.getElementById('expiration-date');
+            const downloadLimitField = document.getElementById('download-limit');
+            const descriptionField = document.getElementById('description');
+            
+            if (passwordField) formData.append('password', passwordField.value);
+            if (expirationField) formData.append('expiration-date', expirationField.value);
+            if (downloadLimitField) formData.append('download-limit', downloadLimitField.value);
+            if (descriptionField) formData.append('description', descriptionField.value);
+            
+            // Show progress bar
+            if (progressContainer) {
+              progressContainer.style.display = 'block';
             }
-          });
-          
-          xhr.addEventListener('load', function() {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              // Success - redirect to the URL returned from the server
-              try {
-                const response = JSON.parse(xhr.responseText);
-                if (response.success && response.redirect_url) {
-                  window.location.href = response.redirect_url;
-                } else {
-                  // If response doesn't contain expected fields
+            if (submitBtn) {
+              submitBtn.disabled = true;
+            }
+            
+            // Use XMLHttpRequest for upload with progress
+            const xhr = new XMLHttpRequest();
+            
+            xhr.upload.addEventListener('progress', function(e) {
+              if (e.lengthComputable && progressFill && progressPercentage) {
+                const percentComplete = Math.round((e.loaded / e.total) * 100);
+                progressFill.style.width = percentComplete + '%';
+                progressPercentage.textContent = percentComplete + '%';
+              }
+            });
+            
+            xhr.addEventListener('load', function() {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                // Success - redirect to the URL returned from the server
+                try {
+                  const response = JSON.parse(xhr.responseText);
+                  if (response.success && response.redirect_url) {
+                    window.location.href = response.redirect_url;
+                  } else {
+                    // If response doesn't contain expected fields
+                    window.location.href = '/';
+                  }
+                } catch (e) {
+                  console.error('Error parsing response:', e);
+                  // If response is not JSON, just redirect to home
                   window.location.href = '/';
                 }
-              } catch (e) {
-                console.error('Error parsing response:', e);
-                // If response is not JSON, just redirect to home
-                window.location.href = '/';
+              } else {
+                // Error handling with more details
+                try {
+                  const response = JSON.parse(xhr.responseText);
+                  alert('Upload failed: ' + (response.error || 'Please try again.'));
+                } catch (e) {
+                  alert('Upload failed. Please try again.');
+                }
+                if (submitBtn) submitBtn.disabled = false;
+                if (progressContainer) progressContainer.style.display = 'none';
               }
-            } else {
-              // Error handling with more details
-              try {
-                const response = JSON.parse(xhr.responseText);
-                alert('Upload failed: ' + (response.error || 'Please try again.'));
-              } catch (e) {
-                alert('Upload failed. Please try again.');
-              }
-              submitBtn.disabled = false;
-              progressContainer.style.display = 'none';
-            }
-          });
-          
-          xhr.addEventListener('error', function() {
-            alert('Network error occurred. Please check your connection and try again.');
-            submitBtn.disabled = false;
-            progressContainer.style.display = 'none';
-          });
-          
-          xhr.addEventListener('abort', function() {
-            alert('Upload was aborted.');
-            submitBtn.disabled = false;
-            progressContainer.style.display = 'none';
-          });
-          
-          // Set up and send the request
-          xhr.open('POST', uploadForm.action, true);
-          xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-          xhr.send(formData);
-        } catch (error) {
-          console.error('Error during form submission:', error);
-          alert('An error occurred while preparing the upload. Please try again.');
-          submitBtn.disabled = false;
-          progressContainer.style.display = 'none';
-        }
-      });
+            });
+            
+            xhr.addEventListener('error', function() {
+              alert('Network error occurred. Please check your connection and try again.');
+              if (submitBtn) submitBtn.disabled = false;
+              if (progressContainer) progressContainer.style.display = 'none';
+            });
+            
+            xhr.addEventListener('abort', function() {
+              alert('Upload was aborted.');
+              if (submitBtn) submitBtn.disabled = false;
+              if (progressContainer) progressContainer.style.display = 'none';
+            });
+            
+            // Set up and send the request
+            xhr.open('POST', uploadForm.action, true);
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.send(formData);
+          } catch (error) {
+            console.error('Error during form submission:', error);
+            alert('An error occurred while preparing the upload. Please try again.');
+            if (submitBtn) submitBtn.disabled = false;
+            if (progressContainer) progressContainer.style.display = 'none';
+          }
+        });
+      }
     });
   </script>
 </body>
