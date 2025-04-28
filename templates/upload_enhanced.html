@@ -23,161 +23,95 @@
       color: #333;
       margin-bottom: 30px;
     }
-    .upload-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 30px;
-    }
     .upload-area {
-      flex: 1;
-      min-width: 300px;
-    }
-    .metadata-area {
-      flex: 1;
-      min-width: 300px;
-    }
-    .drop-zone {
       border: 2px dashed #ccc;
       border-radius: 8px;
       padding: 30px;
       text-align: center;
-      cursor: pointer;
-      transition: all 0.3s;
-      height: 200px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      margin-bottom: 30px;
+      background-color: #f9f9ff;
     }
-    .drop-zone:hover, .drop-zone.active {
-      border-color: #3498db;
-      background-color: #f0f7ff;
-    }
-    .drop-zone i {
-      font-size: 48px;
-      color: #ccc;
+    .upload-icon {
+      font-size: 64px;
+      color: #aaa;
       margin-bottom: 15px;
     }
-    .drop-zone.active i, .drop-zone:hover i {
-      color: #3498db;
-    }
-    .drop-zone-text {
+    .drag-text {
       font-size: 16px;
       color: #666;
+      margin-bottom: 10px;
     }
-    .drop-zone button {
-      background-color: #3498db;
+    .browse-btn {
+      background-color: #4a90e2;
       color: white;
       border: none;
       padding: 10px 20px;
       border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
       margin-top: 15px;
-      cursor: pointer;
-      font-size: 14px;
     }
-    .file-info {
-      margin-top: 20px;
-      padding: 15px;
-      border: 1px solid #e0e0e0;
-      border-radius: 5px;
-      background: #f9f9f9;
-      display: none;
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
     }
-    .file-info p {
-      margin: 5px 0;
-    }
-    .file-info .remove-file {
-      color: #e74c3c;
-      text-decoration: underline;
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 0;
-      font-size: 14px;
-      margin-top: 10px;
+    .form-column {
+      flex: 1;
+      min-width: 250px;
+      padding: 0 10px;
     }
     .form-group {
-      margin-bottom: 20px;
+      margin-bottom: 25px;
     }
     .form-group label {
       display: block;
-      margin-bottom: 8px;
       font-weight: bold;
+      margin-bottom: 8px;
       color: #555;
     }
-    .form-group input {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-      font-size: 16px;
+    .required:after {
+      content: " *";
+      color: #e74c3c;
     }
-    .form-group textarea {
+    .form-control {
       width: 100%;
       padding: 10px;
       border: 1px solid #ddd;
       border-radius: 5px;
       font-size: 16px;
-      min-height: 80px;
+      box-sizing: border-box;
+    }
+    textarea.form-control {
+      min-height: 120px;
       resize: vertical;
     }
-    .form-group input[type="date"] {
-      font-family: Arial, sans-serif;
-    }
-    .form-group small {
-      display: block;
-      margin-top: 5px;
-      color: #777;
+    .help-text {
       font-size: 12px;
+      color: #777;
+      margin-top: 5px;
     }
     .submit-btn {
-      background-color: #2ecc71;
+      background-color: #8c9ca9;
       color: white;
       border: none;
-      padding: 12px;
       width: 100%;
+      padding: 15px;
+      font-size: 16px;
       border-radius: 5px;
       cursor: pointer;
-      font-size: 16px;
-      margin-top: 10px;
       transition: background-color 0.3s;
     }
     .submit-btn:hover {
-      background-color: #27ae60;
+      background-color: #768a98;
     }
-    .submit-btn:disabled {
-      background-color: #95a5a6;
-      cursor: not-allowed;
-    }
-    .progress-container {
-      margin-top: 20px;
+    #file-input {
       display: none;
     }
-    .progress-bar {
-      height: 12px;
-      background-color: #ecf0f1;
-      border-radius: 6px;
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      background-color: #2ecc71;
-      width: 0%;
-      transition: width 0.3s;
-    }
-    .progress-text {
-      text-align: right;
-      font-size: 12px;
-      color: #7f8c8d;
-      margin-top: 5px;
-    }
-    .file-type-icon {
-      font-size: 36px;
-      margin-right: 10px;
-    }
-    @media screen and (max-width: 768px) {
-      .upload-container {
-        flex-direction: column;
+    @media (max-width: 768px) {
+      .form-column {
+        flex: 100%;
+        padding: 0;
       }
     }
   </style>
@@ -185,73 +119,146 @@
 </head>
 <body>
   <div class="container">
-    <h1>Secure File Sharing</h1>
+    <h1>DropIt</h1>
     
-    <form id="upload-form" action="{{ url_for('main.index') }}" method="POST" enctype="multipart/form-data" autocomplete="off">
-      <div class="upload-container">
-        <!-- File Upload Area -->
-        <div class="upload-area">
-          <div id="drop-zone" class="drop-zone">
-            <i class="fas fa-cloud-upload-alt"></i>
-            <p class="drop-zone-text">Drag and drop files here</p>
-            <p class="drop-zone-text">or</p>
-            <button type="button" id="browse-btn">Browse Files</button>
-            <input type="file" id="file-input" name="file" style="display: none;">
+    <form action="{{ url_for('main.index') }}" method="POST" enctype="multipart/form-data" id="upload-form">
+      <!-- File Upload Area -->
+      <div class="upload-area" id="drop-area">
+        <i class="fas fa-cloud-upload-alt upload-icon"></i>
+        <p class="drag-text">Drag and drop files here</p>
+        <p class="drag-text">or</p>
+        <button type="button" class="browse-btn" id="browse-btn">Browse Files</button>
+        <input type="file" id="file-input" name="file" required>
+      </div>
+      
+      <!-- Metadata Form -->
+      <div class="form-row">
+        <div class="form-column">
+          <!-- Password Field -->
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" class="form-control">
+            <p class="help-text">Optional. Recipients will need this password to access the file if provided</p>
           </div>
           
-          <div id="file-info" class="file-info">
-            <div style="display: flex; align-items: center;">
-              <span id="file-type-icon" class="file-type-icon"><i class="fas fa-file"></i></span>
-              <div>
-                <p><strong>File Name:</strong> <span id="file-name"></span></p>
-                <p><strong>File Size:</strong> <span id="file-size"></span></p>
-                <p><strong>File Type:</strong> <span id="file-type"></span></p>
-              </div>
-            </div>
-            <img id="thumbnail-preview" class="thumbnail-preview" style="max-width: 100%; max-height: 150px; margin-top: 10px; border-radius: 4px; display: none;">
-            <button type="button" class="remove-file" id="remove-file">Remove File</button>
-          </div>
-          
-          <div id="progress-container" class="progress-container">
-            <div class="progress-bar">
-              <div id="progress-fill" class="progress-fill"></div>
-            </div>
-            <p class="progress-text"><span id="progress-percentage">0%</span> uploaded</p>
+          <!-- Expiration Date Field -->
+          <div class="form-group">
+            <label for="expiration-date" class="required">Expiration Date</label>
+            <select id="expiration-date" name="expiration-date" class="form-control" required>
+              <option value="1">1 day</option>
+              <option value="2">2 days</option>
+              <option value="3">3 days</option>
+              <option value="5">5 days</option>
+              <option value="7" selected>7 days</option>
+              <option value="10">10 days</option>
+              <option value="14">14 days</option>
+            </select>
+            <p class="help-text">File will be automatically deleted after this period</p>
           </div>
         </div>
         
-        <!-- Metadata Area -->
-        <div class="metadata-area">
-          <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password" required autocomplete="new-password">
-            <small>Recipients will need this password to access the file</small>
-          </div>
-          
-          <div class="form-group">
-            <label for="expiration-date">Expiration Date</label>
-            <input type="date" id="expiration-date" name="expiration-date">
-            <small>File will be deleted after this date (optional)</small>
-          </div>
-          
+        <div class="form-column">
+          <!-- Download Limit Field -->
           <div class="form-group">
             <label for="download-limit">Download Limit</label>
-            <input type="number" id="download-limit" name="download-limit" min="0" placeholder="Unlimited">
-            <small>Maximum number of downloads allowed (optional)</small>
+            <input type="number" id="download-limit" name="download-limit" class="form-control" placeholder="Unlimited" min="0">
+            <p class="help-text">Maximum number of downloads allowed (optional)</p>
           </div>
           
+          <!-- File Description Field -->
           <div class="form-group">
             <label for="description">File Description</label>
-            <textarea id="description" name="description" placeholder="Add a description of this file"></textarea>
-            <small>Help recipients understand what this file contains</small>
+            <textarea id="description" name="description" class="form-control" placeholder="Add a description of this file"></textarea>
+            <p class="help-text">Help recipients understand what this file contains</p>
           </div>
-          
-          <button type="submit" id="submit-btn" class="submit-btn" disabled>Upload File</button>
         </div>
       </div>
+      
+      <!-- Submit Button -->
+      <button type="submit" class="submit-btn" id="upload-btn" disabled>Upload File</button>
     </form>
   </div>
 
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const dropArea = document.getElementById('drop-area');
+      const fileInput = document.getElementById('file-input');
+      const browseBtn = document.getElementById('browse-btn');
+      const uploadBtn = document.getElementById('upload-btn');
+      
+      // Open file dialog when browse button is clicked
+      browseBtn.addEventListener('click', function() {
+        fileInput.click();
+      });
+      
+      // Handle file selection
+      fileInput.addEventListener('change', function() {
+        if (fileInput.files.length > 0) {
+          uploadBtn.disabled = false;
+          dropArea.style.borderColor = '#4a90e2';
+          dropArea.style.backgroundColor = '#e8f4ff';
+          dropArea.innerHTML = `<i class="fas fa-file-alt upload-icon"></i>
+                               <p class="drag-text">${fileInput.files[0].name}</p>
+                               <p class="drag-text">${formatFileSize(fileInput.files[0].size)}</p>`;
+        }
+      });
+      
+      // Handle drag events
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+      });
+      
+      function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, highlight, false);
+      });
+      
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, unhighlight, false);
+      });
+      
+      function highlight() {
+        dropArea.style.borderColor = '#4a90e2';
+        dropArea.style.backgroundColor = '#e8f4ff';
+      }
+      
+      function unhighlight() {
+        dropArea.style.borderColor = '#ccc';
+        dropArea.style.backgroundColor = '#f9f9ff';
+      }
+      
+      // Handle dropped files
+      dropArea.addEventListener('drop', function(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0) {
+          fileInput.files = files;
+          uploadBtn.disabled = false;
+          dropArea.innerHTML = `<i class="fas fa-file-alt upload-icon"></i>
+                                <p class="drag-text">${files[0].name}</p>
+                                <p class="drag-text">${formatFileSize(files[0].size)}</p>`;
+        }
+      });
+      
+      // Format file size
+      function formatFileSize(bytes) {
+        if (bytes < 1024) {
+          return bytes + ' bytes';
+        } else if (bytes < 1048576) {
+          return (bytes / 1024).toFixed(1) + ' KB';
+        } else {
+          return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+      }
+    });
+  </script>
+</body>
+</html>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const dropZone = document.getElementById('drop-zone');

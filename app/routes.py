@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import (
     Blueprint,
@@ -14,7 +14,7 @@ from nanoid import generate
 from pymongo import MongoClient
 
 main = Blueprint("main", __name__)
-UPLOAD_FOLDER = "uploads"
+UPLOAD_FOLDER = "dropit_uploads"
 
 # Ensure upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
@@ -22,8 +22,8 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 # MongoDB connection
 client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
-db = client["filesharing"]
-files_collection = db["uploads"]
+db = client["dropit"]
+files_collection = db["files"]
 
 # File type icons mapping
 file_type_icons = {
@@ -89,8 +89,8 @@ def upload_file():
     file_id = generate()
 
     # Get metadata from the form
-    password = request.form.get("password", "")
-    expiration_date = request.form.get("expiration-date", "")
+    password = request.form.get("password", "")  # Now optional
+    expiration_days = request.form.get("expiration-date", "7")  # Default to 7 days
     download_limit = request.form.get("download-limit", "0")
     description = request.form.get("description", "")
 
@@ -99,6 +99,12 @@ def upload_file():
         download_limit = int(download_limit) if download_limit else 0
     except ValueError:
         download_limit = 0
+    
+    try:
+        expiration_days = int(expiration_days)
+        expiration_date = (datetime.utcnow() + timedelta(days=expiration_days)).strftime("%Y-%m-%d")
+    except ValueError:
+        expiration_date = (datetime.utcnow() + timedelta(days=7)).strftime("%Y-%m-%d")
 
     # Save the file with a unique name
     original_filename = file.filename
