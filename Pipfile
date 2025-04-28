@@ -12,8 +12,12 @@ pytest = "*"
 nanoid = "*"
 minio = "*"
 bcrypt = "*"
+mongomock = "*"
 
 [dev-packages]
+pytest = "*"
+pytest-cov = "*"
+pymongo = "*"
 
 [requires]
 python_version = "3.13"

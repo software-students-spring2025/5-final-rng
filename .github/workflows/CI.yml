@@ -13,6 +13,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    services:
+      mongo:
+        image: mongo:latest
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongo --eval 'db.runCommand({ ping: 1 })'" 
+          --health-interval 10s 
+          --health-timeout 5s 
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -25,9 +36,13 @@ jobs:
         run: |
           pipenv install --dev
 
+      - name: Wait for MongoDB to be ready
+        run: |
+          sleep 10
+
       - name: Test with pytest
         run: |
-          pipenv run pytest
+          pipenv run pytest --cov=app tests/
 
   lint:
     runs-on: ubuntu-latest
@@ -47,5 +62,6 @@ jobs:
 
       - name: lint with ruff
         uses: astral-sh/ruff-action@v3
+
       - run: ruff check --fix
       - run: ruff format

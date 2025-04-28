@@ -80,6 +80,15 @@
     <div class="navbar">🔐 DropIt</div>
 
     <div class="container">
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="error">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
       <div class="lock-icon">🔑</div>
       <h2>Enter Password to Access File</h2>
       <form method="POST" action="/files/{{ file_id }}">
