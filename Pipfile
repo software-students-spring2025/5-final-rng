@@ -11,6 +11,7 @@ ruff = "*"
 pytest = "*"
 nanoid = "*"
 minio = "*"
+bcrypt = "*"
 
 [dev-packages]
 
