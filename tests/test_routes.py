@@ -3,7 +3,7 @@ import tempfile
 import pytest
 import mongomock
 import bcrypt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 from dotenv import load_dotenv
 from app import create_app
@@ -39,7 +39,7 @@ def mongo_collection(app):
             "file_size": 1000,
             "content_type": "text/plain",
             "file_icon": "fa-file",
-            "upload_time": datetime.utcnow(),
+            "upload_time": datetime.now(timezone.utc),
             "password": "",
             "has_password": False,
             "expiration_date": None,
@@ -54,7 +54,7 @@ def mongo_collection(app):
             "file_size": 1200,
             "content_type": "text/plain",
             "file_icon": "fa-file",
-            "upload_time": datetime.utcnow(),
+            "upload_time": datetime.now(timezone.utc),
             "password": hashed_pw,
             "has_password": True,
             "expiration_date": None,
@@ -69,10 +69,10 @@ def mongo_collection(app):
             "file_size": 800,
             "content_type": "text/plain",
             "file_icon": "fa-file",
-            "upload_time": datetime.utcnow(),
+            "upload_time": datetime.now(timezone.utc),
             "password": "",
             "has_password": False,
-            "expiration_date": (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d"),
+            "expiration_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
             "download_limit": 0,
             "download_count": 0,
             "description": "expired test file"
@@ -84,7 +84,7 @@ def mongo_collection(app):
             "file_size": 500,
             "content_type": "text/plain",
             "file_icon": "fa-file",
-            "upload_time": datetime.utcnow(),
+            "upload_time": datetime.now(timezone.utc),
             "password": "",
             "has_password": False,
             "expiration_date": None,

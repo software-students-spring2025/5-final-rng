@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask import (
     Blueprint,
     flash,
@@ -15,7 +15,9 @@ from nanoid import generate
 import bcrypt
 
 main = Blueprint("main", __name__)
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dropit_uploads")
+UPLOAD_FOLDER = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "dropit_uploads"
+)
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -31,6 +33,7 @@ file_type_icons = {
     "text": "fa-file-alt",
     "default": "fa-file",
 }
+
 
 def get_file_icon(filename, content_type):
     if content_type and content_type.startswith("image/"):
@@ -54,9 +57,11 @@ def get_file_icon(filename, content_type):
 
     return file_type_icons["default"]
 
+
 @main.route("/", methods=["GET"])
 def index():
     return render_template("upload_enhanced.html")
+
 
 @main.route("/", methods=["POST"])
 def upload_file():
@@ -90,9 +95,13 @@ def upload_file():
 
     try:
         expiration_days = int(expiration_days)
-        expiration_date = (datetime.utcnow() + timedelta(days=expiration_days)).strftime("%Y-%m-%d")
+        expiration_date = (
+            datetime.now(timezone.utc) + timedelta(days=expiration_days)
+        ).strftime("%Y-%m-%d")
     except ValueError:
-        expiration_date = (datetime.utcnow() + timedelta(days=7)).strftime("%Y-%m-%d")
+        expiration_date = (datetime.now(timezone.utc) + timedelta(days=7)).strftime(
+            "%Y-%m-%d"
+        )
 
     original_filename = file.filename
     saved_name = f"{file_id}_{original_filename}"
@@ -117,7 +126,7 @@ def upload_file():
             "file_size": file_size,
             "content_type": content_type,
             "file_icon": file_icon,
-            "upload_time": datetime.utcnow(),
+            "upload_time": datetime.now(timezone.utc),
             "password": hashed_password,
             "has_password": bool(password),
             "expiration_date": expiration_date,
@@ -132,11 +141,13 @@ def upload_file():
             os.remove(local_path)
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({
-                "success": True,
-                "file_id": file_id,
-                "redirect_url": url_for("main.file_success", file_id=file_id),
-            })
+            return jsonify(
+                {
+                    "success": True,
+                    "file_id": file_id,
+                    "redirect_url": url_for("main.file_success", file_id=file_id),
+                }
+            )
 
         return redirect(url_for("main.file_success", file_id=file_id))
 
@@ -151,6 +162,7 @@ def upload_file():
         flash("Upload failed. Please try again.", "error")
         return redirect(request.url)
 
+
 @main.route("/files/<file_id>", methods=["GET", "POST"])
 def access_file(file_id):
     files_collection = current_app.mongo_db["files"]
@@ -159,12 +171,19 @@ def access_file(file_id):
         return jsonify({"error": "File not found or it is expired"}), 404
 
     if file_doc.get("expiration_date"):
-        expiration_date = datetime.strptime(file_doc["expiration_date"], "%Y-%m-%d")
-        if datetime.utcnow() > expiration_date:
+        # Convert to timezone-aware datetime by adding timezone information
+        expiration_date = datetime.strptime(file_doc["expiration_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        current_date = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        if current_date > expiration_date:
             flash("This file has expired", "error")
             return render_template("download.html", file=file_doc)
 
-    if file_doc.get("download_limit") and file_doc["download_count"] >= file_doc["download_limit"]:
+    if (
+        file_doc.get("download_limit")
+        and file_doc["download_count"] >= file_doc["download_limit"]
+    ):
         flash("Download limit reached", "error")
         return render_template("download.html", file=file_doc)
 
@@ -174,16 +193,21 @@ def access_file(file_id):
     if request.method == "POST":
         entered_password = request.form.get("password", None)
         if entered_password and verify_password(file_doc["password"], entered_password):
-            return render_template("download.html", file=file_doc, password=entered_password)
+            return render_template(
+                "download.html", file=file_doc, password=entered_password
+            )
         else:
             flash("Incorrect password", "error")
             return render_template("verify.html", file_id=file_doc["_id"])
 
     entered_password = request.args.get("password", None)
     if entered_password and verify_password(file_doc["password"], entered_password):
-        return render_template("download.html", file=file_doc, password=entered_password)
+        return render_template(
+            "download.html", file=file_doc, password=entered_password
+        )
 
     return render_template("verify.html", file_id=file_doc["_id"])
+
 
 @main.route("/files/<file_id>/download")
 def download_file(file_id):
@@ -197,10 +221,14 @@ def download_file(file_id):
 
     entered_password = request.args.get("password")
     if file_doc["has_password"]:
-        if not entered_password or not verify_password(file_doc["password"], entered_password):
+        if not entered_password or not verify_password(
+            file_doc["password"], entered_password
+        ):
             return redirect(url_for("main.access_file", file_id=file_id))
 
-    temp_file_path = os.path.join(UPLOAD_FOLDER, os.path.basename(file_doc["saved_filename"]))
+    temp_file_path = os.path.join(
+        UPLOAD_FOLDER, os.path.basename(file_doc["saved_filename"])
+    )
     try:
         os.makedirs(UPLOAD_FOLDER, exist_ok=True)
         minio.fget_object(bucket_name, file_doc["saved_filename"], temp_file_path)
@@ -220,6 +248,7 @@ def download_file(file_id):
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+
 
 @main.route("/files/<file_id>/success")
 def file_success(file_id):
@@ -245,8 +274,11 @@ def file_success(file_id):
         file_size=format_file_size(file_doc["file_size"]),
         expiration_date=file_doc.get("expiration_date", "Never"),
         download_limit=file_doc.get("download_limit", 0) or "Unlimited",
-        download_url=url_for("main.access_file", file_id=file_doc["_id"], _external=True),
+        download_url=url_for(
+            "main.access_file", file_id=file_doc["_id"], _external=True
+        ),
     )
+
 
 def hash_password(password):
     if not password:
@@ -254,6 +286,7 @@ def hash_password(password):
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
     return hashed
+
 
 def verify_password(stored_hash, provided_password):
     if not stored_hash:
