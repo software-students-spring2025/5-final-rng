@@ -13,6 +13,7 @@ nanoid = "*"
 minio = "*"
 bcrypt = "*"
 mongomock = "*"
+coverage = "*"
 
 [dev-packages]
 pytest = "*"
