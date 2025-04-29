@@ -97,7 +97,6 @@ def mongo_collection(app):
     yield collection
     collection.delete_many({})
 
-# ---------------- 基础功能测试 ----------------
 
 def test_homepage_loads(app_client):
     response = app_client.get("/")
@@ -149,7 +148,6 @@ def test_file_download_flow(app_client, mongo_collection):
     )
     assert response.status_code == 200
 
-# ---------------- 边界测试 ----------------
 
 def test_upload_with_invalid_expiration(app_client):
     with tempfile.NamedTemporaryFile(suffix=".txt") as temp:
@@ -185,6 +183,5 @@ def test_download_limit_exceeded(app_client, mongo_collection):
     response = app_client.get("/files/test_download_limit_exceeded", follow_redirects=True)
     assert response.status_code == 200
     assert b'Download limit reached' in response.data
-
-
+    
 
