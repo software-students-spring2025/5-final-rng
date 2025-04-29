@@ -37,19 +37,23 @@ You must create a `.env` file at the root of the project. See `.env.example` for
 Example `.env`:
 
 ```bash
-SECRET_KEY=your_secret_key
+# Flask application settings
+SECRET_KEY=your_secret_key_here
 FLASK_ENV=development
 FLASK_DEBUG=1
 
-MONGO_URI=mongodb://admin:password@localhost:27017/
+# MongoDB connection settings
+MONGO_URI=mongodb://admin:password@mongodb:27017/
 MONGO_USERNAME=admin
 MONGO_PASSWORD=password
 
+# MinIO settings (object storage)
 MINIO_ROOT_USER=admin
 MINIO_ROOT_PASSWORD=pass1234
-MINIO_BUCKET_NAME=file-uploads
-
-MAINTENANCE_API_KEY=your_secure_api_key
+MINIO_URL=http://minio:9000
+MINIO_BUCKET_NAME=dropit-storage
+MINIO_ACCESS_KEY=minio_access_key
+MINIO_SECRET_KEY=minio_secret_key
 ```
 
 ### 3. Run locally with Docker Compose
@@ -58,7 +62,9 @@ MAINTENANCE_API_KEY=your_secure_api_key
 docker-compose up --build
 ```
 
-Access the service at [http://localhost:3000](http://localhost:3000).
+Login Minio dashboard at [http://localhost:9000](http://localhost:9000) and login with root username and password. Generate access key and secret key in dashboard and put then in `.env`
+
+Restart the services, and access the web app at [http://localhost:3000](http://localhost:3000).
 
 ---
 
