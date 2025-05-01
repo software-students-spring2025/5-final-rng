@@ -95,13 +95,20 @@ def upload_file():
 
     try:
         expiration_days = int(expiration_days)
-        expiration_date = (
-            datetime.now(timezone.utc) + timedelta(days=expiration_days)
-        ).strftime("%Y-%m-%d")
-    except ValueError:
-        expiration_date = (datetime.now(timezone.utc) + timedelta(days=7)).strftime(
-            "%Y-%m-%d"
+        # Set expiration to end of day (23:59:59) on the expiration date
+        expiration_datetime = datetime.now(timezone.utc) + timedelta(
+            days=expiration_days
         )
+        expiration_datetime = expiration_datetime.replace(
+            hour=23, minute=59, second=59, microsecond=999999
+        )
+        expiration_date = expiration_datetime.isoformat()
+    except ValueError:
+        expiration_datetime = datetime.now(timezone.utc) + timedelta(days=7)
+        expiration_datetime = expiration_datetime.replace(
+            hour=23, minute=59, second=59, microsecond=999999
+        )
+        expiration_date = expiration_datetime.isoformat()
 
     original_filename = file.filename
     saved_name = f"{file_id}_{original_filename}"
@@ -171,21 +178,26 @@ def access_file(file_id):
         return jsonify({"error": "File not found or it is expired"}), 404
 
     if file_doc.get("expiration_date"):
-        # Convert to timezone-aware datetime by adding timezone information
-        expiration_date = datetime.strptime(file_doc["expiration_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        current_date = datetime.now(timezone.utc).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        # Check if we're using the old date format
+        if len(file_doc["expiration_date"]) == 10:  # YYYY-MM-DD format
+            # Convert to timezone-aware datetime by adding timezone information
+            expiration_date = datetime.strptime(
+                file_doc["expiration_date"], "%Y-%m-%d"
+            ).replace(
+                hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc
+            )
+        else:  # Using new ISO format
+            expiration_date = datetime.fromisoformat(file_doc["expiration_date"])
+
+        current_date = datetime.now(timezone.utc)
         if current_date > expiration_date:
-            flash("This file has expired", "error")
-            return render_template("download.html", file=file_doc)
+            return render_template("download.html", file=file_doc, expired=True)
 
     if (
         file_doc.get("download_limit")
         and file_doc["download_count"] >= file_doc["download_limit"]
     ):
-        flash("Download limit reached", "error")
-        return render_template("download.html", file=file_doc)
+        return render_template("download.html", file=file_doc, limit_reached=True)
 
     if not file_doc["has_password"]:
         return render_template("download.html", file=file_doc)
@@ -218,6 +230,32 @@ def download_file(file_id):
     file_doc = files_collection.find_one({"_id": file_id})
     if not file_doc:
         return jsonify({"error": "File not found or it is expired"}), 404
+
+    # Check if file has expired
+    if file_doc.get("expiration_date"):
+        # Check if we're using the old date format
+        if len(file_doc["expiration_date"]) == 10:  # YYYY-MM-DD format
+            # Convert to timezone-aware datetime by adding timezone information
+            expiration_date = datetime.strptime(
+                file_doc["expiration_date"], "%Y-%m-%d"
+            ).replace(
+                hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc
+            )
+        else:  # Using new ISO format
+            expiration_date = datetime.fromisoformat(file_doc["expiration_date"])
+
+        current_date = datetime.now(timezone.utc)
+        if current_date > expiration_date:
+            flash("This file has expired", "error")
+            return redirect(url_for("main.access_file", file_id=file_id))
+
+    # Check download limits
+    if (
+        file_doc.get("download_limit")
+        and file_doc["download_count"] >= file_doc["download_limit"]
+    ):
+        flash("Download limit reached", "error")
+        return redirect(url_for("main.access_file", file_id=file_id))
 
     entered_password = request.args.get("password")
     if file_doc["has_password"]:
@@ -267,12 +305,28 @@ def file_success(file_id):
         else:
             return f"{size_bytes / 1048576:.1f} MB"
 
+    # Format expiration date for display
+    expiration_display = "Never"
+    if file_doc.get("expiration_date"):
+        try:
+            # Check if we're using the old date format
+            if len(file_doc["expiration_date"]) == 10:  # YYYY-MM-DD format
+                expiration_date = datetime.strptime(
+                    file_doc["expiration_date"], "%Y-%m-%d"
+                )
+            else:  # Using new ISO format
+                expiration_date = datetime.fromisoformat(file_doc["expiration_date"])
+
+            expiration_display = expiration_date.strftime("%b %d, %Y at %I:%M %p")
+        except ValueError:
+            expiration_display = file_doc.get("expiration_date", "Never")
+
     return render_template(
         "success.html",
         file_id=file_doc["_id"],
         file_name=file_doc["original_filename"],
         file_size=format_file_size(file_doc["file_size"]),
-        expiration_date=file_doc.get("expiration_date", "Never"),
+        expiration_date=expiration_display,
         download_limit=file_doc.get("download_limit", 0) or "Unlimited",
         download_url=url_for(
             "main.access_file", file_id=file_doc["_id"], _external=True

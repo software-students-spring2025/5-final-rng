@@ -83,17 +83,31 @@
 
     <div class="container">
       <div class="file-icon">📄</div>
-      <h2>Ready to download your file</h2>
-      <p class="info-text"><strong>Filename:</strong> {{ file.filename }}</p>
+      {% if limit_reached %}
+        <h2>Download limit reached</h2>
+      {% elif expired %}
+        <h2>This file has expired</h2>
+      {% else %}
+        <h2>Ready to download your file</h2>
+      {% endif %}
+      <p class="info-text"><strong>Filename:</strong> {{ file.original_filename }}</p>
       <p class="info-text">
         <strong>Uploaded at:</strong> {{ file.upload_time }}
       </p>
+      
+      {% if file.download_limit %}
+        <p class="info-text">
+          <strong>Downloads:</strong> {{ file.download_count }} / {{ file.download_limit }}
+        </p>
+      {% endif %}
 
+      {% if not limit_reached and not expired %}
       <a
         class="btn"
         href="/files/{{ file._id }}/download?password={{ password }}"
         >⬇️ Download Now</a
       >
+      {% endif %}
     </div>
   </body>
 </html>
